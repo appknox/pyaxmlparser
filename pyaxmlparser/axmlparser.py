@@ -17,10 +17,12 @@
 
 from struct import pack, unpack
 from warnings import warn
+
+import pyaxmlparser.constants as const
 from pyaxmlparser import bytecode
 from pyaxmlparser.stringblock import StringBlock
 from pyaxmlparser.utils import _range
-import pyaxmlparser.constants as const
+from pyaxmlparser import public
 
 
 class AXMLParser(object):
