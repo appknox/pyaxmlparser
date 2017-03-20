@@ -9,7 +9,7 @@ with open('README.rst') as fh:
 
 setup(
     name='pyaxmlparser',
-    version='0.1.4',
+    version='0.1.5',
     url='https://github.com/appknox/pyaxmlparser',
 
     author='Appknox',
