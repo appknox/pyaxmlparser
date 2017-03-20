@@ -5,14 +5,13 @@ dependencies = open('requirements.txt').read().splitlines()
 
 setup(
     name='pyaxmlparser',
-    version='0.1.1',
+    version='0.1.2',
     url='https://github.com/appknox/pyaxmlparser',
     packages=find_packages(exclude=['tests']),
-    include_package_data=True,
     zip_safe=False,
     platforms='any',
     install_requires=dependencies,
-
+    py_modules=['pyaxmlparser'],
     classifiers=[
         'Development Status :: 4 - Beta',
 
