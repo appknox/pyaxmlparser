@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from struct import pack, unpack
+from struct import unpack
 from warnings import warn
 
 import pyaxmlparser.constants as const
