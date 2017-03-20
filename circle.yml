@@ -1,0 +1,16 @@
+machine:
+  python:
+    version: 3.6.0
+
+
+dependencies:
+  override:
+    - pip install -r requirements.txt
+
+test:
+  override:
+    - flake8
+    - coverage run --source=pyaxmlparser -m pytest -vx --ff
+    - coverage report -m
+  post:
+    - codecov -t $CODECOV_TOKEN

@@ -15,12 +15,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from struct import pack, unpack
+from struct import unpack
 from warnings import warn
+
+import pyaxmlparser.constants as const
 from pyaxmlparser import bytecode
 from pyaxmlparser.stringblock import StringBlock
 from pyaxmlparser.utils import _range
-import pyaxmlparser.constants as const
+from pyaxmlparser import public
 
 
 class AXMLParser(object):
