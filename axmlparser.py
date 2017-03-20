@@ -16,7 +16,7 @@ Date created: 2015-08-07
 from pyaxmlparser.axmlprinter import AXMLPrinter
 from pyaxmlparser.arscparser import ARSCParser
 
-f = AXMLPrinter(open("/Users/subho/Desktop/Scans/test/AndroidManifest.xml", 'rb').read())
+f = AXMLPrinter(open("/Users/subho/Desktop/Scans/test/AndroidManifest.xml", 'rb').read()).get_xml_obj()
 r = ARSCParser(open("/Users/subho/Desktop/Scans/test/resources.arsc", "rb").read())
 
 appnamethex = f.getElementsByTagName("application")[0].getAttribute("android:label")
