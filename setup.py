@@ -1,22 +1,28 @@
 from setuptools import find_packages, setup
 
-
-dependencies = open('requirements.txt').read().splitlines()
-
 setup(
     name='pyaxmlparser',
-    version='0.1.1',
+    version='0.2.0',
     url='https://github.com/appknox/pyaxmlparser',
-    packages=find_packages(exclude=['tests']),
+
+    author='Subho Halder',
+    author_email='sunny@appknox.com',
+    license='MIT',
+
+    packages=find_packages(exclude=['tests', 'examples']),
     include_package_data=True,
     zip_safe=False,
     platforms='any',
-    install_requires=dependencies,
+    install_requires=['lxml'],
+    description="Python3 Parser for Android XML file and get Application Name without using Androguard",
+    long_description="Python3 Parser for Android XML file and get Application Name without using Androguard",
 
     classifiers=[
         'Development Status :: 4 - Beta',
 
         'Intended Audience :: Developers',
+
+        'License :: OSI Approved :: MIT License',
 
         'Operating System :: POSIX',
         'Operating System :: MacOS',
@@ -24,7 +30,9 @@ setup(
 
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.5',
 
+        'Topic :: Software Development :: Build Tools',
         'Topic :: Software Development :: Libraries :: Python Modules',
     ]
 )
