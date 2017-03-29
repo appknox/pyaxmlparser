@@ -4,28 +4,25 @@ from pyaxmlparser.utils import get_zip_file
 
 
 class APK:
-    def __init__(self, resource):
-        self.resource = resource
-        self.zip_file = get_zip_file(resource)
+    def __init__(self, apk):
+        self.apk = apk
+        self.zip_file = get_zip_file(apk)
         self.validate()
+        self.axml = AXMLPrinter(self.zip_file.read('AndroidManifest.xml')).get_xml_obj()
+        self.arsc = ARSCParser(self.zip_file.read('resources.arsc'))
 
     def validate(self):
-        files = set(self.zip_file.namelist())
+        zip_files = set(self.zip_file.namelist())
         required_files = {'AndroidManifest.xml', 'resources.arsc'}
-        assert required_files.issubset(files)
+        assert required_files.issubset(zip_files)
 
     @property
     def package_name(self):
-        axml_file = self.zip_file.read('AndroidManifest.xml')
-        axml = AXMLPrinter(axml_file).get_xml_obj()
-        app_name_hex = axml.getElementsByTagName("application")[0].getAttribute("android:label")
+        app_name_hex = self.axml.getElementsByTagName("application")[0].getAttribute("android:label")
         appnamehex = '0x' + app_name_hex[1:]
-
-        rsc_file = self.zip_file.read('resources.arsc')
-        rsc = ARSCParser(rsc_file)
-
-        app_name = rsc.get_string(
-            rsc.get_packages_names()[0],
-            rsc.get_id(rsc.get_packages_names()[0], int(appnamehex, 0))[1]
+        _pkg_name = self.arsc.get_packages_names()[0]
+        app_name = self.arsc.get_string(
+            _pkg_name,
+            self.arsc.get_id(_pkg_name, int(appnamehex, 0))[1]
         )
         return app_name[1]
