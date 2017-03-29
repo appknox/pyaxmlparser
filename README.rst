@@ -16,5 +16,4 @@ Get package name:
 
 
     apk = APK('/foo/bar.apk')
-    apk.validate()
     print(apk.package_name)

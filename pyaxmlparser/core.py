@@ -7,6 +7,7 @@ class APK:
     def __init__(self, resource):
         self.resource = resource
         self.zip_file = get_zip_file(resource)
+        self.validate()
 
     def validate(self):
         files = set(self.zip_file.namelist())
