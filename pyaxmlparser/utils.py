@@ -19,8 +19,8 @@ def _range(a, b, step=None):
 
 
 def get_zip_file(resource):
-    if os.path.isfile(resource):
-        return ZipFile(resource)
     if isinstance(resource, bytes):
         return ZipFile(io.BytesIO(resource))
+    if os.path.isfile(resource):
+        return ZipFile(resource)
     raise TypeError('Resource should be file or bytes stream')
