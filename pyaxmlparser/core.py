@@ -17,7 +17,7 @@ class APK:
         assert required_files.issubset(zip_files)
 
     @property
-    def package_name(self):
+    def appplication(self):
         app_name_hex = self.axml.getElementsByTagName("application")[0].getAttribute("android:label")
         appnamehex = '0x' + app_name_hex[1:]
         _pkg_name = self.arsc.get_packages_names()[0]
