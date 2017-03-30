@@ -4,6 +4,9 @@ from pyaxmlparser.utils import get_zip_file
 
 
 class APK:
+
+    NS_ANDROID_URI = 'http://schemas.android.com/apk/res/android'
+
     def __init__(self, apk):
         self.apk = apk
         self.zip_file = get_zip_file(apk)
@@ -26,3 +29,16 @@ class APK:
             self.arsc.get_id(_pkg_name, int(appnamehex, 0))[1]
         )
         return app_name[1]
+
+    @property
+    def version_name(self):
+        return self.axml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionName")
+
+    @property
+    def version_code(self):
+        return self.axml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionCode")
+
+    @property
+    def package(self):
+        return self.axml.documentElement.getAttribute("package")
+
