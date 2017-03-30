@@ -16,4 +16,9 @@ Get package name:
 
 
     apk = APK('/foo/bar.apk')
-    print(apk.package_name)
+    print(apk.package)
+    print(apk.version_name)
+    print(apk.version_code)
+    print(apk.icon_info)
+    print(apk.icon_data)
+    print(apk.application)
