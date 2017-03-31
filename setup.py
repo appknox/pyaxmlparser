@@ -17,6 +17,7 @@ setup(
     description="Python3 Parser for Android XML file and get Application Name without using Androguard",
     long_description="Python3 Parser for Android XML file and get Application Name without using Androguard",
 
+    keywords='appknox axmlparser arscparser android',
     classifiers=[
         'Development Status :: 4 - Beta',
 
