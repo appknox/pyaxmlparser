@@ -11,7 +11,8 @@ class APK:
         self.apk = apk
         self.zip_file = get_zip_file(apk)
         self.validate()
-        self.axml = AXMLPrinter(self.zip_file.read('AndroidManifest.xml')).get_xml_obj()
+        self.axml = AXMLPrinter(self.zip_file.read('AndroidManifest.xml'))
+        self.xml = self.axml.get_xml_obj()
         self.arsc = ARSCParser(self.zip_file.read('resources.arsc'))
 
     def validate(self):
@@ -32,19 +33,19 @@ class APK:
 
     @property
     def version_name(self):
-        return self.axml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionName")
+        return self.xml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionName")
 
     @property
     def version_code(self):
-        return self.axml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionCode")
+        return self.xml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionCode")
 
     @property
     def package(self):
-        return self.axml.documentElement.getAttribute("package")
+        return self.xml.documentElement.getAttribute("package")
 
     @property
     def icon_info(self):
-        icon_hex = '0x' + self.axml.getElementsByTagName('application')[0].getAttribute('android:icon')[1:]
+        icon_hex = '0x' + self.xml.getElementsByTagName('application')[0].getAttribute('android:icon')[1:]
         icon_data = self.arsc.get_id(self.package, int(icon_hex, 0))
         icon_type, icon_name = icon_data[0], icon_data[1]
         return icon_type, icon_name
