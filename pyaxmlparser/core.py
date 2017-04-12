@@ -23,14 +23,13 @@ class APK:
     @property
     def application(self):
         app_name_hex = self.xml.getElementsByTagName("application")[0].getAttribute("android:label")
-        if app_name_hex.startswith('@'):
-            _pkg_name = self.arsc.get_packages_names()[0]
-            rsc = self.get_resource(app_name_hex, _pkg_name)
-            if rsc:
-                app_name = rsc
-        else:
-            app_name = self.package
-        return app_name
+        if not app_name_hex.startswith('@'):
+            return app_name_hex
+        _pkg_name = self.arsc.get_packages_names()[0]
+        app_name = self.get_resource(app_name_hex, _pkg_name)
+        if app_name:
+            return app_name
+        return self.package
 
     @property
     def version_name(self):
