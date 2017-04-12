@@ -34,14 +34,16 @@ class APK:
 
     @property
     def version_name(self):
-        version_name = self.xml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionName")
+        version_name = self.axml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionName")
         if version_name.startswith("@"):
             rsc = self.get_resource(version_name, self.package)
             if rsc:
                 version_name = rsc
-        else:
-            return version_name
-
+                
+        if not version_name:
+            version_name = self.axml.documentElement.getAttribute("android:versionName")
+        return version_name
+      
     def get_resource(self, key, value):
         try:
             key = '0x' + key[1:]
@@ -53,8 +55,10 @@ class APK:
 
     @property
     def version_code(self):
-        return self.xml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionCode")
-
+        if not version_code:
+            version_code = self.axml.documentElement.getAttribute("android:versionCode")
+        return version_code
+     
     @property
     def package(self):
         return self.xml.documentElement.getAttribute("package")
