@@ -1,11 +1,9 @@
 from pyaxmlparser.arscparser import ARSCParser
 from pyaxmlparser.axmlprinter import AXMLPrinter
-from pyaxmlparser.utils import get_zip_file
+from pyaxmlparser.utils import get_zip_file, getxml_value
 
 
 class APK:
-
-    NS_ANDROID_URI = 'http://schemas.android.com/apk/res/android'
 
     def __init__(self, apk):
         self.apk = apk
@@ -34,16 +32,12 @@ class APK:
 
     @property
     def version_name(self):
-        version_name = self.xml.documentElement.getAttributeNS(
-            self.NS_ANDROID_URI, "versionName")
-        if version_name.startswith("@"):
-            rsc = self.get_resource(version_name, self.package)
-            if rsc:
-                version_name = rsc
-
-        if not version_name:
-            version_name = self.xml.documentElement.getAttribute(
-                "android:versionName")
+        version_name = getxml_value(self.xml.documentElement, "versionName")
+        if not version_name.startswith("@"):
+            return version_name
+        rsc = self.get_resource(version_name, self.package)
+        if rsc:
+            version_name = rsc
         return version_name
 
     def get_resource(self, key, value):
@@ -57,11 +51,7 @@ class APK:
 
     @property
     def version_code(self):
-        version_code = self.xml.documentElement.getAttributeNS(
-            self.NS_ANDROID_URI, "versionCode")
-        if not version_code:
-            version_code = self.xml.documentElement.getAttribute(
-                "android:versionCode")
+        version_code = getxml_value(self.xml.documentElement, "versionCode")
         return version_code
 
     @property
