@@ -22,32 +22,34 @@ class APK:
 
     @property
     def application(self):
-        try:
-            app_name_hex = self.xml.getElementsByTagName("application")[0].getAttribute("android:label")
-            appnamehex = '0x' + app_name_hex[1:]
+        app_name_hex = self.xml.getElementsByTagName("application")[0].getAttribute("android:label")
+        if app_name_hex.startswith('@'):
             _pkg_name = self.arsc.get_packages_names()[0]
-            app_name = self.arsc.get_string(
-                _pkg_name,
-                self.arsc.get_id(_pkg_name, int(appnamehex, 0))[1]
-            )
-            app_name = app_name[1]
-        except Exception:
+            rsc = self.get_resource(app_name_hex, _pkg_name)
+            if rsc:
+                app_name = rsc
+        else:
             app_name = self.package
         return app_name
 
     @property
     def version_name(self):
         version_name = self.xml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionName")
-        if not version_name.startswith("@"):
+        if version_name.startswith("@"):
+            rsc = self.get_resource(version_name, self.package)
+            if rsc:
+                version_name = rsc
+        else:
             return version_name
+
+    def get_resource(self, key, value):
         try:
-            versionhex = '0x' + version_name[1:]
-            version_name = self.arsc.get_string(
-                self.package,
-                self.arsc.get_id(self.package, int(versionhex, 0))[1])[1]
-            return version_name
-        except Exception:
-            pass
+            key = '0x' + key[1:]
+            hex_value = self.arsc.get_id(value, int(key, 0))[1]
+            rsc = self.arsc.get_string(value, hex_value)[1]
+        except:
+            rsc = None
+        return rsc
 
     @property
     def version_code(self):
