@@ -22,7 +22,8 @@ class APK:
 
     @property
     def application(self):
-        app_name_hex = self.xml.getElementsByTagName("application")[0].getAttribute("android:label")
+        app_name_hex = self.xml.getElementsByTagName(
+            "application")[0].getAttribute("android:label")
         if not app_name_hex.startswith('@'):
             return app_name_hex
         _pkg_name = self.arsc.get_packages_names()[0]
@@ -33,14 +34,16 @@ class APK:
 
     @property
     def version_name(self):
-        version_name = self.xml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionName")
+        version_name = self.xml.documentElement.getAttributeNS(
+            self.NS_ANDROID_URI, "versionName")
         if version_name.startswith("@"):
             rsc = self.get_resource(version_name, self.package)
             if rsc:
                 version_name = rsc
 
         if not version_name:
-            version_name = self.xml.documentElement.getAttribute("android:versionName")
+            version_name = self.xml.documentElement.getAttribute(
+                "android:versionName")
         return version_name
 
     def get_resource(self, key, value):
@@ -54,9 +57,11 @@ class APK:
 
     @property
     def version_code(self):
-        version_code = self.xml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionCode")
+        version_code = self.xml.documentElement.getAttributeNS(
+            self.NS_ANDROID_URI, "versionCode")
         if not version_code:
-            version_code = self.xml.documentElement.getAttribute("android:versionCode")
+            version_code = self.xml.documentElement.getAttribute(
+                "android:versionCode")
         return version_code
 
     @property
@@ -65,7 +70,8 @@ class APK:
 
     @property
     def icon_info(self):
-        icon_hex = '0x' + self.xml.getElementsByTagName('application')[0].getAttribute('android:icon')[1:]
+        icon_hex = '0x' + self.xml.getElementsByTagName(
+            'application')[0].getAttribute('android:icon')[1:]
         icon_data = self.arsc.get_id(self.package, int(icon_hex, 0))
         icon_type, icon_name = icon_data[0], icon_data[1]
         return icon_type, icon_name
