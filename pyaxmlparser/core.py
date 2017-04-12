@@ -22,14 +22,18 @@ class APK:
 
     @property
     def application(self):
-        app_name_hex = self.axml.getElementsByTagName("application")[0].getAttribute("android:label")
-        appnamehex = '0x' + app_name_hex[1:]
-        _pkg_name = self.arsc.get_packages_names()[0]
-        app_name = self.arsc.get_string(
-            _pkg_name,
-            self.arsc.get_id(_pkg_name, int(appnamehex, 0))[1]
-        )
-        return app_name[1]
+        try:
+            app_name_hex = self.xml.getElementsByTagName("application")[0].getAttribute("android:label")
+            appnamehex = '0x' + app_name_hex[1:]
+            _pkg_name = self.arsc.get_packages_names()[0]
+            app_name = self.arsc.get_string(
+                _pkg_name,
+                self.arsc.get_id(_pkg_name, int(appnamehex, 0))[1]
+            )
+            app_name = app_name[1]
+        except Exception:
+            app_name = self.package
+        return app_name
 
     @property
     def version_name(self):
