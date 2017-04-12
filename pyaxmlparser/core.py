@@ -32,11 +32,17 @@ class APK:
 
     @property
     def version_name(self):
-        return self.axml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionName")
+        version_name = self.axml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionName")
+        if not version_name:
+            version_name = self.axml.documentElement.getAttribute("android:versionName")
+        return version_name
 
     @property
     def version_code(self):
-        return self.axml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionCode")
+        version_code = self.axml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionCode")
+        if not version_code:
+            version_code = self.axml.documentElement.getAttribute("android:versionCode")
+        return version_code
 
     @property
     def package(self):
