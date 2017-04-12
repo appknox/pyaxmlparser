@@ -37,7 +37,17 @@ class APK:
 
     @property
     def version_name(self):
-        return self.xml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionName")
+        version_name = self.xml.documentElement.getAttributeNS(self.NS_ANDROID_URI, "versionName")
+        if not version_name.startswith("@"):
+            return version_name
+        try:
+            versionhex = '0x' + version_name[1:]
+            version_name = self.arsc.get_string(
+                self.package,
+                self.arsc.get_id(self.package, int(versionhex, 0))[1])[1]
+            return version_name
+        except Exception:
+            pass
 
     @property
     def version_code(self):
