@@ -125,7 +125,7 @@ class AXMLPrinter(object):
         elif _type == const.TYPE_DIMENSION:
             return "%f%s" % (
                 complexToFloat(_data),
-                const.DIMENSION_UNITS[_data & COMPLEX_UNIT_MASK])
+                const.DIMENSION_UNITS[_data & const.COMPLEX_UNIT_MASK])
 
         elif _type == const.TYPE_FRACTION:
             return "%f%s" % (
