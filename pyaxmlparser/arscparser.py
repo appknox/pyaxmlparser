@@ -16,12 +16,12 @@
 # limitations under the License.
 
 from pyaxmlparser import bytecode
-from struct import pack, unpack
+from struct import unpack
 from pyaxmlparser.arscutil import ARSCHeader, ARSCResTablePackage, \
     ARSCResTypeSpec, ARSCResType, ARSCResTableEntry
 from pyaxmlparser.stringblock import StringBlock
 import pyaxmlparser.constants as const
-from pyaxmlparser.utils import _range
+from pyaxmlparser.utils import _range, complexToFloat
 from warnings import warn
 
 
@@ -216,7 +216,7 @@ class ARSCParser(object):
                 "%s%s" % (
                     complexToFloat(ate.key.get_data()),
                     const.DIMENSION_UNITS[
-                        ate.key.get_data() & COMPLEX_UNIT_MASK])]
+                        ate.key.get_data() & const.COMPLEX_UNIT_MASK])]
         except Exception:
             return [ate.get_value(), ate.key.get_data()]
 

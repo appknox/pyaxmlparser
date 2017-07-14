@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from struct import pack, unpack
+from struct import unpack
 from pyaxmlparser.utils import _range
 
 
@@ -50,8 +50,6 @@ class ARSCHeader(object):
         self.header_size = unpack('<h', buff.read(2))[0]
         self.size = unpack('<i', buff.read(4))[0]
 
-        # print "ARSCHeader", hex(self.start), hex(self.type),
-        # hex(self.header_size), hex(self.size)
 
 class ARSCResTypeSpec(object):
 
