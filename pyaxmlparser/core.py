@@ -60,13 +60,13 @@ class APK:
 
     @property
     def icon_info(self):
-        icon_hex = '0x' + self.xml.getElementsByTagName(
-            'application')[0].getAttribute('android:icon')[1:]
-        icon_data = self.arsc.get_id(self.package, int(icon_hex, 0))
-        if icon_data:
-            icon_type, icon_name = icon_data[0], icon_data[1]
-        else:
-            icon_type, icon_name = None, None
+        icon_type, icon_name = None, None
+        app_icon = self.xml.getElementsByTagName('application')[0].getAttribute('android:icon')[1:]
+        if app_icon:
+            icon_id = int('0x' + app_icon, 0)
+            icon_data = self.arsc.get_id(self.package, icon_id)
+            if icon_data:
+                icon_type, icon_name = icon_data[0], icon_data[1]
         return icon_type, icon_name
 
     @property
