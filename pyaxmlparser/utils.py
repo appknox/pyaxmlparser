@@ -7,6 +7,7 @@ import lxml.sax
 
 
 NS_ANDROID_URI = 'http://schemas.android.com/apk/res/android'
+RADIX_MULTS = [0.00390625, 3.051758E-005, 1.192093E-007, 4.656613E-010]
 
 
 def parse_lxml_dom(tree):
@@ -40,3 +41,7 @@ def getxml_value(item, attribute, string=False):
     if not name:
         name = is_str(item.getAttribute("android:" + attribute), string)
     return name
+
+
+def complexToFloat(xcomplex):
+    return float(xcomplex & 0xFFFFFF00) * RADIX_MULTS[(xcomplex >> 4) & 3]
