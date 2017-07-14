@@ -3,3 +3,4 @@ lxml==3.7.3
 # testing
 pytest==3.0.6
 flake8==3.3.0
+coverage==4.4.1
