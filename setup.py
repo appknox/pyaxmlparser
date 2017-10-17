@@ -14,6 +14,11 @@ setup(
     zip_safe=False,
     platforms='any',
     install_requires=['lxml'],
+    entry_points='''
+    [console_scripts]
+    apkinfo = pyaxmlparser.cli:main
+    ''',
+    py_modules=['pyaxmlparser'],
     description="Python3 Parser for Android XML file and get Application Name without using Androguard",
     long_description="Python3 Parser for Android XML file and get Application Name without using Androguard",
 
