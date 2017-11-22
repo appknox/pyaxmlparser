@@ -62,7 +62,7 @@ class APK:
     def icon_info(self):
         icon_type, icon_name = None, None
         app = self.xml.getElementsByTagName('application')[0]
-        app_icon = app.getAttribute('android:icon')[1:] or app.getAttribute('androidicon')[1:]
+        app_icon = app.getAttribute('android:icon')[1:]
 
         if app_icon:
             icon_id = int('0x' + app_icon, 0)

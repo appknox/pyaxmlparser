@@ -267,9 +267,13 @@ class AXMLParser(object):
         res = self.sb.getString(name)
         if not res:
             attr = self.m_resourceIDs[name]
-            if attr in public.SYSTEM_RESOURCES['attributes']['inverse']:
-                res = 'android' + \
-                    public.SYSTEM_RESOURCES['attributes']['inverse'][attr]
+            inverse_attr = public.SYSTEM_RESOURCES['attributes']['inverse']
+            if attr in inverse_attr:
+                if ":" in inverse_attr[attr][-1]:
+                    res = 'android'
+                else:
+                    res = 'android:'
+                res += public.SYSTEM_RESOURCES['attributes']['inverse'][attr]
 
         return res
 

@@ -40,6 +40,9 @@ def getxml_value(item, attribute, string=False):
     name = is_str(item.getAttributeNS(NS_ANDROID_URI, attribute), string)
     if not name:
         name = is_str(item.getAttribute("android:" + attribute), string)
+    # Emergency if
+    if not name:
+        name = is_str(item.getAttribute("android" + attribute), string)
     return name
 
 
