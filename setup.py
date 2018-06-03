@@ -1,8 +1,10 @@
 from setuptools import find_packages, setup
 
+__VERSION__ = '0.3.7'
+
 setup(
     name='pyaxmlparser',
-    version='0.3.7',
+    version=__VERSION__,
     url='https://github.com/appknox/pyaxmlparser',
 
     author='Subho Halder',
