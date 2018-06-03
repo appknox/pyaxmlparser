@@ -42,10 +42,10 @@ def complexToFloat(xcomplex):
     return float(xcomplex & 0xFFFFFF00) * RADIX_MULTS[(xcomplex >> 4) & 3]
 
 
-def long2int(l):
-    if l > 0x7fffffff:
-        l = (0x7fffffff & l) - 0x80000000
-    return l
+def long2int(input_l):
+    if input_l > 0x7fffffff:
+        input_l = (0x7fffffff & input_l) - 0x80000000
+    return input_l
 
 
 def getPackage(i):
