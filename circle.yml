@@ -2,10 +2,10 @@ machine:
   python:
     version: 3.6.0
 
-
 dependencies:
   override:
     - pip install -r requirements.txt
+    - pip install codecov
 
 test:
   override:
