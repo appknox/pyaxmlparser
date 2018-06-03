@@ -1,8 +1,7 @@
 from pyaxmlparser.arscparser import ARSCParser
 from pyaxmlparser.axmlprinter import AXMLPrinter
 from pyaxmlparser.arscutil import ARSCResTableConfig
-from pyaxmlparser.utils import get_zip_file
-from pyaxmlparser.constants import NSANDROID
+from pyaxmlparser.utils import get_zip_file, NS_ANDROID
 from warnings import warn
 
 
@@ -37,7 +36,7 @@ class APK:
         for item in tag:
             skip_this_item = False
             for attr, val in list(attribute_filter.items()):
-                attr_val = item.get(NSANDROID + attr)
+                attr_val = item.get(NS_ANDROID + attr)
                 if attr_val != val:
                     skip_this_item = True
                     break
@@ -45,7 +44,7 @@ class APK:
             if skip_this_item:
                 continue
 
-            value = item.get(NSANDROID + attribute)
+            value = item.get(NS_ANDROID + attribute)
 
             if value is not None:
                 return value
@@ -83,20 +82,20 @@ class APK:
         for item in activities_and_aliases:
             # Some applications have more than one MAIN activity.
             # For example: paid and free content
-            activityEnabled = item.get(NSANDROID + "enabled")
+            activityEnabled = item.get(NS_ANDROID + "enabled")
             if activityEnabled is not None and \
                     activityEnabled != "" and activityEnabled == "false":
                 continue
 
             for sitem in item.findall(".//action"):
-                val = sitem.get(NSANDROID + "name")
+                val = sitem.get(NS_ANDROID + "name")
                 if val == "android.intent.action.MAIN":
-                    x.add(item.get(NSANDROID + "name"))
+                    x.add(item.get(NS_ANDROID + "name"))
 
             for sitem in item.findall(".//category"):
-                val = sitem.get(NSANDROID + "name")
+                val = sitem.get(NS_ANDROID + "name")
                 if val == "android.intent.category.LAUNCHER":
-                    y.add(item.get(NSANDROID + "name"))
+                    y.add(item.get(NS_ANDROID + "name"))
 
         z = x.intersection(y)
         if len(z) > 0:
@@ -139,7 +138,7 @@ class APK:
 
     @property
     def version_name(self):
-        version_name = self.xml.get(NSANDROID + "versionName")
+        version_name = self.xml.get(NS_ANDROID + "versionName")
         if not version_name.startswith("@"):
             return version_name
         rsc = self.get_resource(version_name, self.package)
@@ -158,7 +157,7 @@ class APK:
 
     @property
     def version_code(self):
-        version_code = self.xml.get(NSANDROID + "versionCode")
+        version_code = self.xml.get(NS_ANDROID + "versionCode")
         return version_code
 
     @property
@@ -169,7 +168,7 @@ class APK:
     def icon_info(self):
         icon_type, icon_name = None, None
         app = self.xml.findall('.//application')[0]
-        app_icon = app.get(NSANDROID + 'icon')[1:]
+        app_icon = app.get(NS_ANDROID + 'icon')[1:]
 
         if app_icon:
             icon_id = int('0x' + app_icon, 0)

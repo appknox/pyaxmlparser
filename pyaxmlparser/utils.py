@@ -9,6 +9,7 @@ import lxml.sax
 
 
 NS_ANDROID_URI = 'http://schemas.android.com/apk/res/android'
+NS_ANDROID = '{http://schemas.android.com/apk/res/android}'
 RADIX_MULTS = [0.00390625, 3.051758E-005, 1.192093E-007, 4.656613E-010]
 
 

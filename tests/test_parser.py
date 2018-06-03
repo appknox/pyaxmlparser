@@ -3,7 +3,7 @@ import sys
 
 from pyaxmlparser.arscparser import ARSCParser
 from pyaxmlparser.axmlprinter import AXMLPrinter
-from pyaxmlparser.constants import NSANDROID
+from pyaxmlparser.utils import NS_ANDROID
 
 
 PATH_INSTALL = "./"
@@ -14,7 +14,7 @@ test_apk = 'tests/test_apk/'
 def test_app_name_extraction():
     axml_file = os.path.join(test_apk, 'AndroidManifest.xml')
     axml = AXMLPrinter(open(axml_file, 'rb').read()).get_xml_obj()
-    app_name_hex = axml.findall(".//application")[0].get(NSANDROID + "label")
+    app_name_hex = axml.findall(".//application")[0].get(NS_ANDROID + "label")
     appnamehex = '0x' + app_name_hex[1:]
 
     rsc_file = os.path.join(test_apk, 'resources.arsc')
