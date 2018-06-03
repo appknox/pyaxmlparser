@@ -15,7 +15,7 @@ setup(
     include_package_data=True,
     zip_safe=False,
     platforms='any',
-    install_requires=['lxml'],
+    install_requires=['lxml', 'click==6.7'],
     entry_points='''
     [console_scripts]
     apkinfo = pyaxmlparser.cli:main
