@@ -2,6 +2,8 @@ import io
 import os.path
 from xml.dom.pulldom import SAX2DOM
 from zipfile import ZipFile
+import pyaxmlparser.constants as const
+from struct import unpack, pack
 
 import lxml.sax
 
@@ -36,15 +38,59 @@ def is_str(item, string=False):
     return item
 
 
-def getxml_value(item, attribute, string=False):
-    name = is_str(item.getAttributeNS(NS_ANDROID_URI, attribute), string)
-    if not name:
-        name = is_str(item.getAttribute("android:" + attribute), string)
-    # Emergency if
-    if not name:
-        name = is_str(item.getAttribute("android" + attribute), string)
-    return name
-
-
 def complexToFloat(xcomplex):
     return float(xcomplex & 0xFFFFFF00) * RADIX_MULTS[(xcomplex >> 4) & 3]
+
+
+def long2int(l):
+    if l > 0x7fffffff:
+        l = (0x7fffffff & l) - 0x80000000
+    return l
+
+
+def getPackage(i):
+    if i >> 24 == 1:
+        return "android:"
+    return ""
+
+
+def format_value(_type, _data, lookup_string=lambda ix: "<string>"):
+    if _type == const.TYPE_STRING:
+        return lookup_string(_data)
+
+    elif _type == const.TYPE_ATTRIBUTE:
+        return "?%s%08X" % (getPackage(_data), _data)
+
+    elif _type == const.TYPE_REFERENCE:
+        return "@%s%08X" % (getPackage(_data), _data)
+
+    elif _type == const.TYPE_FLOAT:
+        return "%f" % unpack("=f", pack("=L", _data))[0]
+
+    elif _type == const.TYPE_INT_HEX:
+        return "0x%08X" % _data
+
+    elif _type == const.TYPE_INT_BOOLEAN:
+        if _data == 0:
+            return "false"
+        return "true"
+
+    elif _type == const.TYPE_DIMENSION:
+        return "%f%s" % (
+            complexToFloat(_data),
+            const.DIMENSION_UNITS[_data & const.COMPLEX_UNIT_MASK]
+        )
+
+    elif _type == const.TYPE_FRACTION:
+        return "%f%s" % (
+            complexToFloat(_data) * 100,
+            const.FRACTION_UNITS[_data & const.COMPLEX_UNIT_MASK]
+        )
+
+    elif const.TYPE_FIRST_COLOR_INT <= _type <= const.TYPE_LAST_COLOR_INT:
+        return "#%08X" % _data
+
+    elif const.TYPE_FIRST_INT <= _type <= const.TYPE_LAST_INT:
+        return "%d" % long2int(_data)
+
+    return "<0x%X, type 0x%02X>" % (_data, _type)

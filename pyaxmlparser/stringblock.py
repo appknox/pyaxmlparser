@@ -15,161 +15,157 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from struct import unpack
 from warnings import warn
-from struct import pack, unpack
-from pyaxmlparser.utils import _range
 
-UTF8_FLAG = 0x00000100
-CHUNK_STRINGPOOL_TYPE = 0x001C0001
-CHUNK_NULL_TYPE = 0x00000000
+# Flags in the STRING Section
+SORTED_FLAG = 1 << 0
+UTF8_FLAG = 1 << 8
 
 
 class StringBlock(object):
-
-    def __init__(self, buff):
-        self.start = buff.get_idx()
+    """
+    StringBlock is a CHUNK inside an AXML File
+    It contains all strings, which are used by referecing to ID's
+    TODO might migrate this block into the ARSCParser, as it it not a "special" block but a normal tag.
+    """
+    def __init__(self, buff, header):
         self._cache = {}
-        self.header_size, self.header = self.skipNullPadding(buff)
-
-        self.chunkSize = unpack('<i', buff.read(4))[0]
+        self.header = header
+        # We already read the header (which was chunk_type and chunk_size
+        # Now, we read the string_count:
         self.stringCount = unpack('<i', buff.read(4))[0]
+        # style_count
         self.styleOffsetCount = unpack('<i', buff.read(4))[0]
 
+        # flags
         self.flags = unpack('<i', buff.read(4))[0]
         self.m_isUTF8 = ((self.flags & UTF8_FLAG) != 0)
 
+        # string_pool_offset
+        # The string offset is counted from the beginning of the string section
         self.stringsOffset = unpack('<i', buff.read(4))[0]
+        # style_pool_offset
+        # The styles offset is counted as well from the beginning of the string section
         self.stylesOffset = unpack('<i', buff.read(4))[0]
+
+        # Check if they supplied a stylesOffset even if the count is 0:
+        if self.styleOffsetCount == 0 and self.stylesOffset > 0:
+            warn("Styles Offset given, but styleCount is zero.")
 
         self.m_stringOffsets = []
         self.m_styleOffsets = []
-        self.m_strings = []
+        self.m_charbuff = ""
         self.m_styles = []
 
-        for i in _range(0, self.stringCount):
+        # Next, there is a list of string following
+        # This is only a list of offsets (4 byte each)
+        for i in range(0, self.stringCount):
             self.m_stringOffsets.append(unpack('<i', buff.read(4))[0])
 
-        for i in _range(0, self.styleOffsetCount):
+        # And a list of styles
+        # again, a list of offsets
+        for i in range(0, self.styleOffsetCount):
             self.m_styleOffsets.append(unpack('<i', buff.read(4))[0])
 
-        size = self.chunkSize - self.stringsOffset
-        if self.stylesOffset != 0:
+        # FIXME it is probably better to parse n strings and not the size
+        size = self.header.size - self.stringsOffset
+
+        # if there are styles as well, we do not want to read them too.
+        # Only read them, if no
+        if self.stylesOffset != 0 and self.styleOffsetCount != 0:
             size = self.stylesOffset - self.stringsOffset
 
-        # FIXME
+        # FIXME unaligned
         if (size % 4) != 0:
-            warn("ooo")
+            warn("Size of strings is not aligned by four bytes.")
 
-        for i in _range(0, size):
-            self.m_strings.append(unpack('=b', buff.read(1))[0])
+        self.m_charbuff = buff.read(size)
 
-        if self.stylesOffset != 0:
-            size = self.chunkSize - self.stylesOffset
+        if self.stylesOffset != 0 and self.styleOffsetCount != 0:
+            size = self.header.size - self.stylesOffset
 
-            # FIXME
+            # FIXME unaligned
             if (size % 4) != 0:
-                warn("ooo")
+                warn("Size of styles is not aligned by four bytes.")
 
-            for i in _range(0, int(size / 4)):
+            for i in range(0, size // 4):
                 self.m_styles.append(unpack('<i', buff.read(4))[0])
-
-    def skipNullPadding(self, buff):
-        def readNext(buff, first_run=True):
-            header = unpack('<i', buff.read(4))[0]
-
-            if header == CHUNK_NULL_TYPE and first_run:
-                header = readNext(buff, first_run=False)
-            elif header != CHUNK_STRINGPOOL_TYPE:
-                warn("Invalid StringBlock header")
-
-            return header
-
-        header = readNext(buff)
-        return header >> 8, header & 0xFF
 
     def getString(self, idx):
         if idx in self._cache:
-            return self._cache[idx].replace("\x00", "")
+            return self._cache[idx]
 
-        if idx < 0 or not self.m_stringOffsets or \
-                idx >= len(self.m_stringOffsets):
+        if idx < 0 or not self.m_stringOffsets or idx >= len(
+                self.m_stringOffsets):
             return ""
 
         offset = self.m_stringOffsets[idx]
 
-        if not self.m_isUTF8:
-            length = self.getShort2(self.m_strings, offset)
-            offset += 2
-            self._cache[idx] = self.decode(self.m_strings, offset, length)
+        if self.m_isUTF8:
+            self._cache[idx] = self.decode8(offset)
         else:
-            offset += self.getVarint(self.m_strings, offset)[1]
-            varint = self.getVarint(self.m_strings, offset)
+            self._cache[idx] = self.decode16(offset)
 
-            offset += varint[1]
-            length = varint[0]
-
-            self._cache[idx] = self.decode2(self.m_strings, offset, length)
-
-        return self._cache[idx].replace("\x00", "")
+        return self._cache[idx]
 
     def getStyle(self, idx):
-        return
-        print(idx)
-        print(idx in self.m_styleOffsets, self.m_styleOffsets[idx])
+        # FIXME
+        return self.m_styles[idx]
 
-        print(self.m_styles[0])
+    def decode8(self, offset):
+        str_len, skip = self.decodeLength(offset, 1)
+        offset += skip
 
-    def decode(self, array, offset, length):
-        length = length * 2
-        length = length + length % 2
+        encoded_bytes, skip = self.decodeLength(offset, 1)
+        offset += skip
 
-        data = ""
+        data = self.m_charbuff[offset: offset + encoded_bytes]
 
-        for i in _range(0, length):
-            t_data = pack("=b", self.m_strings[offset + i])
-            data += str(t_data, errors='ignore')
-            if data[-2:] == "\x00\x00":
-                break
+        return self.decode_bytes(data, 'utf-8', str_len)
 
-        end_zero = data.find("\x00\x00")
-        if end_zero != -1:
-            data = data[:end_zero]
+    def decode16(self, offset):
+        str_len, skip = self.decodeLength(offset, 2)
+        offset += skip
 
-        return data
+        encoded_bytes = str_len * 2
 
-    def decode2(self, array, offset, length):
-        data = ""
+        data = self.m_charbuff[offset: offset + encoded_bytes]
 
-        for i in _range(0, length):
-            t_data = pack("=b", self.m_strings[offset + i])
-            data += str(t_data, errors='ignore')
+        return self.decode_bytes(data, 'utf-16', str_len)
 
-        return data
+    def decode_bytes(self, data, encoding, str_len):
+        string = data.decode(encoding, 'replace')
+        if len(string) != str_len:
+            warn("invalid decoded string length")
+        return string
 
-    def getVarint(self, array, offset):
-        val = array[offset]
-        more = (val & 0x80) != 0
-        val &= 0x7f
+    def decodeLength(self, offset, sizeof_char):
+        length = self.m_charbuff[offset]
 
-        if not more:
-            return val, 1
-        return val << 8 | array[offset + 1] & 0xff, 2
+        sizeof_2chars = sizeof_char << 1
+        fmt_chr = 'B' if sizeof_char == 1 else 'H'
+        fmt = "<2" + fmt_chr
 
-    def getShort(self, array, offset):
-        value = array[offset / 4]
-        if ((offset % 4) / 2) == 0:
-            return value & 0xFFFF
+        length1, length2 = unpack(
+            fmt, self.m_charbuff[offset:(offset + sizeof_2chars)])
+
+        highbit = 0x80 << (8 * (sizeof_char - 1))
+
+        if (length & highbit) != 0:
+            return (
+                (length1 & ~highbit) << (8 * sizeof_char)
+            ) | length2, sizeof_2chars
         else:
-            return value >> 16
-
-    def getShort2(self, array, offset):
-        return (array[offset + 1] & 0xff) << 8 | array[offset] & 0xff
+            return length1, sizeof_char
 
     def show(self):
-        return
-        print(
-            "StringBlock", hex(self.start), hex(self.header),
-            hex(self.header_size), hex(self.chunkSize), hex(self.stringsOffset),
-            self.m_stringOffsets)
-        for i in _range(0, len(self.m_stringOffsets)):
+        print("StringBlock(%x, %x, %x, %x, %x, %x" % (
+            self.start,
+            self.header,
+            self.header_size,
+            self.chunkSize,
+            self.stringsOffset,
+            self.flags))
+        for i in range(0, len(self.m_stringOffsets)):
             print(i, repr(self.getString(i)))

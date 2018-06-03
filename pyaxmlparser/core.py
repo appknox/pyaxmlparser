@@ -1,6 +1,7 @@
 from pyaxmlparser.arscparser import ARSCParser
 from pyaxmlparser.axmlprinter import AXMLPrinter
-from pyaxmlparser.utils import get_zip_file, getxml_value
+from pyaxmlparser.utils import get_zip_file
+from pyaxmlparser.constants import NSANDROID
 
 
 class APK:
@@ -20,8 +21,8 @@ class APK:
 
     @property
     def application(self):
-        app_name_hex = self.xml.getElementsByTagName(
-            "application")[0].getAttribute("android:label")
+        app_name_hex = self.xml.findall(".//application")[0].get(
+            NSANDROID + "label")
         if not app_name_hex.startswith('@'):
             return app_name_hex
         _pkg_name = self.arsc.get_packages_names()[0]
@@ -32,7 +33,7 @@ class APK:
 
     @property
     def version_name(self):
-        version_name = getxml_value(self.xml.documentElement, "versionName")
+        version_name = self.xml.get(NSANDROID + "versionName")
         if not version_name.startswith("@"):
             return version_name
         rsc = self.get_resource(version_name, self.package)
@@ -51,18 +52,18 @@ class APK:
 
     @property
     def version_code(self):
-        version_code = getxml_value(self.xml.documentElement, "versionCode")
+        version_code = self.xml.get(NSANDROID + "versionCode")
         return version_code
 
     @property
     def package(self):
-        return self.xml.documentElement.getAttribute("package")
+        return self.xml.get("package")
 
     @property
     def icon_info(self):
         icon_type, icon_name = None, None
-        app = self.xml.getElementsByTagName('application')[0]
-        app_icon = app.getAttribute('android:icon')[1:]
+        app = self.xml.findall('.//application')[0]
+        app_icon = app.get(NSANDROID + 'icon')[1:]
 
         if app_icon:
             icon_id = int('0x' + app_icon, 0)
