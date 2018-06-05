@@ -151,7 +151,8 @@ class APK:
             key = '0x' + key[1:]
             hex_value = self.arsc.get_id(value, int(key, 0))[1]
             rsc = self.arsc.get_string(value, hex_value)[1]
-        except Exception as err:
+        except Exception as e:
+            warn(str(e))
             rsc = None
         return rsc
 
