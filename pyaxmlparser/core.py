@@ -122,7 +122,7 @@ class APK:
         if app_name is None:
             # No App name set
             # TODO return packagename instead?
-            return self.package()
+            return self.package
         if app_name.startswith("@"):
             res_id = int(app_name[1:], 16)
             res_parser = self.arsc
@@ -133,7 +133,7 @@ class APK:
                     ARSCResTableConfig.default_config())[0][1]
             except Exception as e:
                 warn("Exception selecting app name: %s" % e)
-                app_name = self.package()
+                app_name = self.package
         return app_name
 
     @property
