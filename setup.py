@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-__VERSION__ = '0.3.9'
+__VERSION__ = '0.3.10'
 
 setup(
     name='pyaxmlparser',
