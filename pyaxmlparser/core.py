@@ -252,3 +252,17 @@ class APK:
             return int(target_sdk_version)
         except (ValueError, TypeError):
             return 1
+
+    @property
+    def get_permissions(self):
+        permissions = []
+
+        for tag in ["uses-permission", "permission"]:
+            tag = self.xml.findall('.//' + tag)
+            if len(tag) != 0:
+                for item in tag:
+                    value = item.get(NS_ANDROID + "name")
+                    if value is not None:
+                        permissions.append(value)
+
+        return permissions
