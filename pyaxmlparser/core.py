@@ -139,6 +139,8 @@ class APK:
     @property
     def version_name(self):
         version_name = self.xml.get(NS_ANDROID + "versionName")
+        if not version_name:
+            return
         if not version_name.startswith("@"):
             return version_name
         rsc = self.get_resource(version_name, self.package)
