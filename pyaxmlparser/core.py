@@ -1,8 +1,12 @@
+
+import logging
 from pyaxmlparser.arscparser import ARSCParser
 from pyaxmlparser.axmlprinter import AXMLPrinter
 from pyaxmlparser.arscutil import ARSCResTableConfig
 from pyaxmlparser.utils import get_zip_file, NS_ANDROID
-from warnings import warn
+
+
+log = logging.getLogger("pyaxmlparser.core")
 
 
 class APK:
@@ -132,7 +136,7 @@ class APK:
                     res_id,
                     ARSCResTableConfig.default_config())[0][1]
             except Exception as e:
-                warn("Exception selecting app name: %s" % e)
+                log.warning("Exception selecting app name: %s" % e)
                 app_name = self.package
         return app_name
 
@@ -154,7 +158,7 @@ class APK:
             hex_value = self.arsc.get_id(value, int(key, 0))[1]
             rsc = self.arsc.get_string(value, hex_value)[1]
         except Exception as e:
-            warn(str(e))
+            log.warning(str(e))
             rsc = None
         return rsc
 
@@ -222,7 +226,7 @@ class APK:
                         app_icon = file_name
                         current_dpi = dpi
             except Exception as e:
-                warn("Exception selecting app icon: %s" % e)
+                log.warning("Exception selecting app icon: %s" % e)
 
         return self.zip_file.read(app_icon)
 

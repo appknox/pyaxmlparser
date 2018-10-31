@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from pyaxmlparser import bytecode
 import collections
 from struct import unpack
@@ -24,7 +25,8 @@ from pyaxmlparser.stringblock import StringBlock
 import pyaxmlparser.constants as const
 from pyaxmlparser.utils import complexToFloat
 from xml.sax.saxutils import escape
-from warnings import warn
+
+log = logging.getLogger("pyaxmlparser.arscparser")
 
 
 class ARSCParser(object):
@@ -102,7 +104,7 @@ class ARSCParser(object):
                 # Read all other headers
                 while self.buff.get_idx() <= package_data_end - ARSCHeader.SIZE:
                     pkg_chunk_header = ARSCHeader(self.buff)
-                    warn("Found a header: {}".format(pkg_chunk_header))
+                    log.debug("Found a header: {}".format(pkg_chunk_header))
                     if pkg_chunk_header.start + pkg_chunk_header.size > package_data_end:
                         # we are way off the package chunk; bail out
                         break
@@ -117,7 +119,7 @@ class ARSCParser(object):
                         self.packages[package_name].append(a_res_type)
                         self.resource_configs[package_name][a_res_type].add(a_res_type.config)
 
-                        warn("Config: {}".format(a_res_type.config))
+                        log.debug("Config: {}".format(a_res_type.config))
 
                         entries = []
                         for i in range(0, a_res_type.entryCount):
@@ -143,7 +145,7 @@ class ARSCParser(object):
                                     # Not sure if this is a good solution though
                                     self.buff.set_idx(ate.start)
                     elif pkg_chunk_header.type == const.RES_TABLE_LIBRARY_TYPE:
-                        warn("RES_TABLE_LIBRARY_TYPE chunk is not supported")
+                        log.warning("RES_TABLE_LIBRARY_TYPE chunk is not supported")
                     else:
                         # silently skip other chunk types
                         pass
@@ -274,7 +276,7 @@ class ARSCParser(object):
                     const.DIMENSION_UNITS[ate.key.get_data() & const.COMPLEX_UNIT_MASK])
             ]
         except IndexError:
-            warn("Out of range dimension unit index for %s: %s" % (
+            log.warning("Out of range dimension unit index for %s: %s" % (
                 complexToFloat(ate.key.get_data()),
                 ate.key.get_data() & const.COMPLEX_UNIT_MASK))
             return [ate.get_value(), ate.key.get_data()]
@@ -630,7 +632,7 @@ given result.
             raise ValueError("'rid' must be an int")
 
         if rid not in self.resource_values:
-            warn("The requested rid could not be found in the resources.")
+            log.warning("The requested rid could not be found in the resources.")
             return []
 
         res_options = self.resource_values[rid]
@@ -638,7 +640,7 @@ given result.
             if config in res_options:
                 return [(config, res_options[config])]
             elif fallback and config == ARSCResTableConfig.default_config():
-                warn("No default resource config could be found for the given rid, using fallback!")
+                log.warning("No default resource config could be found for the given rid, using fallback!")
                 return [list(self.resource_values[rid].items())[0]]
             else:
                 return []
