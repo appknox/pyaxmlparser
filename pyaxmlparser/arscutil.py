@@ -15,10 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from struct import unpack
-from warnings import warn
 import pyaxmlparser.constants as const
 from pyaxmlparser.utils import format_value
+
+log = logging.getLogger("pyaxmlparser.arscutil")
 
 
 class ARSCResTablePackage(object):
@@ -178,7 +180,7 @@ class ARSCResTableConfig(object):
 
             self.exceedingSize = self.size - 36
             if self.exceedingSize > 0:
-                warn("Skipping padding bytes!")
+                log.debug("Skipping padding bytes!")
                 self.padding = buff.read(self.exceedingSize)
 
         # TODO there is screenConfig2

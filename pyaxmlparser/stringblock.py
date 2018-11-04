@@ -15,8 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from struct import unpack
-from warnings import warn
+
+
+log = logging.getLogger("pyaxmlparser.stringblock")
+
 
 # Flags in the STRING Section
 SORTED_FLAG = 1 << 0
@@ -51,7 +55,7 @@ class StringBlock(object):
 
         # Check if they supplied a stylesOffset even if the count is 0:
         if self.styleOffsetCount == 0 and self.stylesOffset > 0:
-            warn("Styles Offset given, but styleCount is zero.")
+            log.warning("Styles Offset given, but styleCount is zero.")
 
         self.m_stringOffsets = []
         self.m_styleOffsets = []
@@ -78,7 +82,7 @@ class StringBlock(object):
 
         # FIXME unaligned
         if (size % 4) != 0:
-            warn("Size of strings is not aligned by four bytes.")
+            log.warning("Size of strings is not aligned by four bytes.")
 
         self.m_charbuff = buff.read(size)
 
@@ -87,7 +91,7 @@ class StringBlock(object):
 
             # FIXME unaligned
             if (size % 4) != 0:
-                warn("Size of styles is not aligned by four bytes.")
+                log.warning("Size of styles is not aligned by four bytes.")
 
             for i in range(0, size // 4):
                 self.m_styles.append(unpack('<i', buff.read(4))[0])
@@ -137,7 +141,7 @@ class StringBlock(object):
     def decode_bytes(self, data, encoding, str_len):
         string = data.decode(encoding, 'replace')
         if len(string) != str_len:
-            warn("invalid decoded string length")
+            log.warning("invalid decoded string length")
         return string
 
     def decodeLength(self, offset, sizeof_char):

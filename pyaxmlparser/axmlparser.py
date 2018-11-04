@@ -15,8 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from struct import unpack
-from warnings import warn
 from collections import defaultdict
 
 import pyaxmlparser.constants as const
@@ -24,6 +24,8 @@ from pyaxmlparser import bytecode
 from pyaxmlparser.stringblock import StringBlock
 from pyaxmlparser import public
 from . import arscutil
+
+log = logging.getLogger("pyaxmlparser.axmlparser")
 
 
 class AXMLParser(object):
@@ -45,14 +47,14 @@ class AXMLParser(object):
 
             if axml_file >> 16 == 0x0008:
                 self.axml_tampered = True
-                warn(
+                log.warning(
                     "AXML file has an unusual header, most malwares like "
                     "doing such stuff to anti androguard! But we try to parse "
                     "it anyways. Header: 0x{:08x}".format(axml_file)
                 )
             else:
                 self.valid_axml = False
-                warn("Not a valid AXML file. Header 0x{:08x}".format(axml_file))
+                log.warning("Not a valid AXML file. Header 0x{:08x}".format(axml_file))
                 return
 
         # Next is the filesize
@@ -129,7 +131,7 @@ class AXMLParser(object):
                 # Check size: < 8 bytes mean that the chunk is not complete
                 # Should be aligned to 4 bytes.
                 if chunkSize < 8 or chunkSize % 4 != 0:
-                    warn("Invalid chunk size in chunk RESOURCEIDS")
+                    log.warning("Invalid chunk size in chunk RESOURCEIDS")
 
                 for i in range(0, (chunkSize // 4) - 2):
                     self.m_resourceIDs.append(
@@ -140,7 +142,7 @@ class AXMLParser(object):
             # FIXME, unknown chunk types might cause problems
             if chunkType < const.CHUNK_XML_FIRST or \
                     chunkType > const.CHUNK_XML_LAST:
-                warn("invalid chunk type 0x{:08x}".format(chunkType))
+                log.warning("invalid chunk type 0x{:08x}".format(chunkType))
 
             # Fake START_DOCUMENT event.
             if chunkType == const.CHUNK_XML_START_TAG and event == -1:
@@ -206,7 +208,7 @@ class AXMLParser(object):
                         self.visited_ns.remove((uri, prefix))
 
                     else:
-                        warn(
+                        log.warning(
                             "Reached a NAMESPACE_END without having the "
                             "namespace stored before? Prefix ID: {}, URI ID: "
                             "{}".format(prefix, uri)
@@ -329,7 +331,7 @@ class AXMLParser(object):
                 # FIXME Packers like Liapp use empty uri to fool XML Parser
                 # FIXME they also mess around with the Manifest, thus it can not be parsed easily
                 if prefix_uri == '':
-                    warn("Empty Namespace URI for Namespace {}.".format(prefix_str))
+                    log.warning("Empty Namespace URI for Namespace {}.".format(prefix_str))
                     self.packerwarning = True
 
                 # if prefix is (null), which is indicated by an empty str, then do not print :
@@ -345,12 +347,12 @@ class AXMLParser(object):
     def getAttributeOffset(self, index):
         # FIXME
         if self.m_event != const.START_TAG:
-            warn("Current event is not START_TAG.")
+            log.warning("Current event is not START_TAG.")
 
         offset = index * 5
         # FIXME
         if offset >= len(self.m_attributes):
-            warn("Invalid attribute index")
+            log.warning("Invalid attribute index")
 
         return offset
 
