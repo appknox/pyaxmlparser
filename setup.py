@@ -2,6 +2,9 @@ from setuptools import find_packages, setup
 
 __VERSION__ = '0.3.11'
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setup(
     name='pyaxmlparser',
     version=__VERSION__,
@@ -22,7 +25,7 @@ setup(
     ''',
     py_modules=['pyaxmlparser'],
     description="Python3 Parser for Android XML file and get Application Name without using Androguard",
-    long_description="Python3 Parser for Android XML file and get Application Name without using Androguard",
+    long_description=long_description,
 
     keywords='appknox axmlparser arscparser android',
     classifiers=[
