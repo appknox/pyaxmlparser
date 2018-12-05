@@ -11,7 +11,7 @@ import pyaxmlparser
 here = path.abspath(path.dirname(__file__))
 
 
-with open(path.join(here, 'README.md'), 'r', encoding='utf-8') as f:
+with open(path.join(here, 'README.rst'), 'r', encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
