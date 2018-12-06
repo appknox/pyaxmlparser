@@ -14,9 +14,11 @@ class APK:
         self.apk = apk
         self.zip_file = get_zip_file(apk)
         self.validate()
-        self.android_xml = AXMLPrinter(self.zip_file.read('AndroidManifest.xml'))
+        self.android_xml = AXMLPrinter(
+            self.zip_file.read('AndroidManifest.xml'), debug=debug)
         self.xml = self.android_xml.get_xml_obj()
-        self.android_resource = ARSCParser(self.zip_file.read('resources.arsc'))
+        self.android_resource = ARSCParser(
+            self.zip_file.read('resources.arsc'), debug=debug)
 
     def validate(self):
         zip_files = set(self.zip_file.namelist())
@@ -260,9 +262,13 @@ class APK:
 
     @property
     def get_uses_permissions(self):
+        """
+        find all uses-permission and uses-permission-sdk-* example uses-permission-sdk-23
+        :return: list
+        """
         permissions = []
-        tag = self.xml.findall('.//uses-permission')
-        for item in tag:
+        elements = self.xml.xpath("//*[starts-with(name(), 'uses-permission')]")
+        for item in elements:
             value = item.get(NS_ANDROID + 'name')
             if value is not None and value not in permissions:
                 permissions.append(value)
@@ -270,9 +276,13 @@ class APK:
 
     @property
     def get_permissions(self):
+        """
+        find permission
+        :return: list
+        """
         permissions = []
-        tag = self.xml.findall('.//permission')
-        for item in tag:
+        elements = self.xml.findall('.//permission')
+        for item in elements:
             value = item.get(NS_ANDROID + 'name')
             if value is not None and value not in permissions:
                 permissions.append(value)
@@ -280,6 +290,41 @@ class APK:
 
     @property
     def get_all_permissions(self):
+        """
+        find all permission
+        :return: list
+        """
         permissions = self.get_permissions
         permissions.extend(self.get_uses_permissions)
         return list(set(permissions))
+
+    @property
+    def get_uses_feature(self, required=None):
+        """
+        :param required: None - return all uses feature.
+        :param required: True - return all uses feature is required.
+        :param required: False - return all uses feature is not required.
+        :return:
+        """
+        uses_feature = []
+        elements = self.xml.findall('.//uses-feature')
+        for item in elements:
+            value = item.get(NS_ANDROID + 'name')
+            if value is not None and value not in uses_feature:
+                if required is None:
+                    uses_feature.append(value)
+                elif required and item.get(NS_ANDROID + 'required') == 'true':
+                    uses_feature.append(value)
+                elif not required and item.get(NS_ANDROID + 'required') == 'false':
+                    uses_feature.append(value)
+                else:
+                    continue
+        return uses_feature
+
+    @property
+    def get_gles_version(self):
+        gl_es_version = None
+        result = self.xml.xpath("//uses-feature/@*[contains(name(), 'glEsVersion')]")
+        if len(result):
+            gl_es_version = result[0]
+        return gl_es_version
