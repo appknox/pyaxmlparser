@@ -44,7 +44,8 @@ class AXMLParser(object):
         self.style_attribute = -1
         self.namespace = -1
         data = b''
-        if hasattr(raw_buff, "read"):
+
+        if hasattr(raw_buff, 'read'):
             data = raw_buff.read()
         else:
             path_to_file = None
@@ -62,8 +63,7 @@ class AXMLParser(object):
                     with open(path_to_file, 'rb') as xml_file:
                         data = xml_file.read()
             else:
-                if raw_buff:
-                    data = raw_buff
+                data = raw_buff
 
         if not isinstance(data, string_types):
             raise ValueError('AXMLParser need file path to apk or xml, str or bytes data.')
