@@ -173,6 +173,14 @@ class APK:
         return self.xml.get('package')
 
     @property
+    def platform_build_version_code(self):
+        return self.xml.get('platformBuildVersionCode')
+
+    @property
+    def platform_build_version_name(self):
+        return self.xml.get('platformBuildVersionName')
+
+    @property
     def icon_info(self):
         icon_type, icon_name = None, None
         app = self.xml.findall('.//application')[0]
@@ -246,11 +254,11 @@ class APK:
     @property
     def get_effective_target_sdk_version(self):
         """
-    Return the effective targetSdkVersion, always returns int > 0.
-    If the targetSdkVersion is not set, it defaults to 1.  This is
-    set based on defaults as defined in:
-    https://developer.android.com/guide/topics/manifest/uses-sdk-element.html
-    :rtype: int
+        Return the effective targetSdkVersion, always returns int > 0.
+        If the targetSdkVersion is not set, it defaults to 1.  This is
+        set based on defaults as defined in:
+        https://developer.android.com/guide/topics/manifest/uses-sdk-element.html
+        :rtype: int
         """
         target_sdk_version = self.get_target_sdk_version
         if not target_sdk_version:
@@ -261,7 +269,7 @@ class APK:
             return 1
 
     @property
-    def get_uses_permissions(self):
+    def uses_permissions(self):
         """
         find all uses-permission and uses-permission-sdk-* example uses-permission-sdk-23
         :return: list
@@ -275,7 +283,7 @@ class APK:
         return permissions
 
     @property
-    def get_permissions(self):
+    def permissions(self):
         """
         find permission
         :return: list
@@ -289,16 +297,27 @@ class APK:
         return permissions
 
     @property
-    def get_all_permissions(self):
+    def all_permissions(self):
         """
         find all permission
         :return: list
         """
-        permissions = self.get_permissions
-        permissions.extend(self.get_uses_permissions)
+        permissions = self.permissions
+        permissions.extend(self.uses_permissions)
         return list(set(permissions))
 
     @property
+    def uses_feature(self):
+        return self.get_uses_feature()
+
+    @property
+    def uses_feature_required(self):
+        return self.get_uses_feature(True)
+
+    @property
+    def uses_feature_non_required(self):
+        return self.get_uses_feature(False)
+
     def get_uses_feature(self, required=None):
         """
         :param required: None - return all uses feature.
@@ -322,6 +341,9 @@ class APK:
         return uses_feature
 
     @property
+    def gles_version(self):
+        return self.get_gles_version()
+
     def get_gles_version(self):
         gl_es_version = None
         result = self.xml.xpath("//uses-feature/@*[contains(name(), 'glEsVersion')]")
