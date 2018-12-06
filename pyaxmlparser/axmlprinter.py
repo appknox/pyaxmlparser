@@ -16,6 +16,7 @@
 # limitations under the License.
 
 from __future__ import unicode_literals
+import logging
 from pyaxmlparser.axmlparser import AXMLParser
 from pyaxmlparser.utils import format_value
 import pyaxmlparser.constants as const
@@ -34,7 +35,9 @@ class AXMLPrinter(object):
     """
     Converter for Android XML Files into a XML string
     """
-    def __init__(self, raw_buff):
+    def __init__(self, raw_buff, debug=False):
+        self.log = logging.getLogger('pyaxmlparser.axmlprinter')
+        self.log.setLevel(logging.DEBUG if debug else logging.CRITICAL)
         self.android_xml = AXMLParser(raw_buff)
         self.xmlns = False
 
