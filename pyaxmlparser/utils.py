@@ -32,10 +32,11 @@ def get_zip_file(resource):
         is_zip = False
     if is_zip:
         return ZipFile(resource)
-    elif isinstance(resource, bytes):
+    if isinstance(resource, string_types):
+        if not isinstance(resource, bytes):
+            resource = resource.encode()
         return ZipFile(io.BytesIO(resource))
-    else:
-        raise TypeError('Resource should be file or bytes stream')
+    raise TypeError('Resource should be file or bytes stream')
 
 
 def is_str(item, string=False):
