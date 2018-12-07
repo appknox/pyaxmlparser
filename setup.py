@@ -34,6 +34,7 @@ setup(
     py_modules=['pyaxmlparser'],
     description=pyaxmlparser.__description__,
     long_description=long_description,
+    long_description_content_type='text/markdown',
     keywords='appknox axmlparser arscparser android',
     classifiers=[
         'Development Status :: 4 - Beta',

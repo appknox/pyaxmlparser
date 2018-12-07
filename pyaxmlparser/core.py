@@ -13,17 +13,14 @@ class APK:
         self.log.setLevel(logging.DEBUG if debug else logging.CRITICAL)
         self.apk = apk
         self.zip_file = get_zip_file(apk)
-        self.validate()
+        assert 'AndroidManifest.xml' in self.zip_file.namelist()
         self.android_xml = AXMLPrinter(
             self.zip_file.read('AndroidManifest.xml'), debug=debug)
         self.xml = self.android_xml.get_xml_obj()
-        self.android_resource = ARSCParser(
-            self.zip_file.read('resources.arsc'), debug=debug)
-
-    def validate(self):
-        zip_files = set(self.zip_file.namelist())
-        required_files = {'AndroidManifest.xml', 'resources.arsc'}
-        assert required_files.issubset(zip_files)
+        self.android_resource = None
+        if 'resources.arsc' in self.zip_file.namelist():
+            self.android_resource = ARSCParser(
+                self.zip_file.read('resources.arsc'), debug=debug)
 
     def get_element(self, tag_name, attribute, **attribute_filter):
         """
@@ -124,7 +121,7 @@ class APK:
             app_name = self.get_element(
                 'activity', 'label', name=main_activity_name)
 
-        if app_name is None:
+        if app_name is None or self.android_resource is None:
             # No App name set
             # TODO return package name instead?
             return self.package
@@ -154,13 +151,14 @@ class APK:
         return version_name
 
     def get_resource(self, key, value):
-        try:
-            key = '0x' + key[1:]
-            hex_value = self.android_resource.get_id(value, int(key, 0))[1]
-            rsc = self.android_resource.get_string(value, hex_value)[1]
-        except Exception as e:
-            self.log.warning(str(e))
-            rsc = None
+        rsc = None
+        if self.android_resource is not None:
+            try:
+                key = '0x' + key[1:]
+                hex_value = self.android_resource.get_id(value, int(key, 0))[1]
+                rsc = self.android_resource.get_string(value, hex_value)[1]
+            except Exception as e:
+                self.log.warning(str(e))
         return rsc
 
     @property
@@ -186,7 +184,7 @@ class APK:
         app = self.xml.findall('.//application')[0]
         app_icon = app.get(NS_ANDROID + 'icon')[1:]
 
-        if app_icon:
+        if app_icon and self.android_resource is not None:
             icon_id = int('0x' + app_icon, 0)
             icon_data = self.android_resource.get_id(self.package, icon_id)
             if icon_data:
@@ -204,13 +202,13 @@ class APK:
         if not app_icon:
             app_icon = self.get_element('application', 'icon')
 
-        if not app_icon:
+        if not app_icon and self.android_resource is not None:
             res_id = self.android_resource.get_res_id_by_key(
                 self.package, 'mipmap', 'ic_launcher')
             if res_id:
                 app_icon = '@%x' % res_id
 
-        if not app_icon:
+        if not app_icon and self.android_resource is not None:
             res_id = self.android_resource.get_res_id_by_key(
                 self.package, 'drawable', 'ic_launcher')
             if res_id:
@@ -220,7 +218,7 @@ class APK:
             # If the icon can not be found, return now
             return None
 
-        if app_icon.startswith('@'):
+        if app_icon.startswith('@') and self.android_resource is not None:
             res_id = int(app_icon[1:], 16)
             res_parser = self.android_resource
             candidates = res_parser.get_resolved_res_configs(res_id)
