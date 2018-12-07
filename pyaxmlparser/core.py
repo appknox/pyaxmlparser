@@ -164,7 +164,7 @@ class APK:
     @property
     def version_code(self):
         version_code = self.xml.get(NS_ANDROID + 'versionCode')
-        return version_code
+        return version_code if version_code else 1
 
     @property
     def package(self):
@@ -172,11 +172,20 @@ class APK:
 
     @property
     def platform_build_version_code(self):
-        return self.xml.get('platformBuildVersionCode')
+        platform_build_version_code_value = \
+            self.xml.get('platformBuildVersionCode')
+        if not platform_build_version_code_value:
+            platform_build_version_code_value = \
+                self.get_min_sdk_version
+        return platform_build_version_code_value
 
     @property
     def platform_build_version_name(self):
-        return self.xml.get('platformBuildVersionName')
+        platform_build_version_name_value = \
+            self.xml.get('platformBuildVersionName')
+        if not platform_build_version_name_value:
+            platform_build_version_name_value = ''
+        return platform_build_version_name_value
 
     @property
     def icon_info(self):
@@ -273,11 +282,20 @@ class APK:
         :return: list
         """
         permissions = []
-        elements = self.xml.xpath("//*[starts-with(name(), 'uses-permission')]")
-        for item in elements:
-            value = item.get(NS_ANDROID + 'name')
-            if value is not None and value not in permissions:
-                permissions.append(value)
+        if hasattr(self.xml, 'xpath'):
+            elements = self.xml.findall("//*[starts-with(name(), 'uses-permission')]")
+            for item in elements:
+                value = item.get(NS_ANDROID + 'name')
+                if value is not None and value not in permissions:
+                    permissions.append(value)
+        else:
+            manifest = self.xml.findall('.//manifest')
+            if manifest:
+                for item in manifest.getiterator():
+                    if item.tag.startswith('uses-permission'):
+                        value = item.get(NS_ANDROID + 'name')
+                        if value is not None and value not in permissions:
+                            permissions.append(value)
         return permissions
 
     @property
@@ -344,7 +362,14 @@ class APK:
 
     def get_gles_version(self):
         gl_es_version = None
-        result = self.xml.xpath("//uses-feature/@*[contains(name(), 'glEsVersion')]")
-        if len(result):
-            gl_es_version = result[0]
+        if hasattr(self.xml, 'xpath'):
+            result = self.xml.xpath("//uses-feature/@*[contains(name(), 'glEsVersion')]")
+            if len(result):
+                gl_es_version = result[0]
+        else:
+            elements = self.xml.findall('.//uses-feature')
+            for item in elements:
+                value = item.get(NS_ANDROID + 'glEsVersion')
+                if value:
+                    gl_es_version = value
         return gl_es_version
