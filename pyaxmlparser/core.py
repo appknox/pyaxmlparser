@@ -3,7 +3,7 @@ import logging
 from pyaxmlparser.arscparser import ARSCParser
 from pyaxmlparser.axmlprinter import AXMLPrinter
 from pyaxmlparser.arscutil import ARSCResTableConfig
-from pyaxmlparser.utils import get_zip_file, NS_ANDROID
+from pyaxmlparser.utils import get_zip_file, NS_ANDROID, string_to_int
 
 
 class APK:
@@ -126,16 +126,17 @@ class APK:
             # TODO return package name instead?
             return self.package
         if app_name.startswith('@'):
-            res_id = int(app_name[1:], 16)
-            res_parser = self.android_resource
-
-            try:
-                app_name = res_parser.get_resolved_res_configs(
-                    res_id,
-                    ARSCResTableConfig.default_config())[0][1]
-            except Exception as e:
-                self.log.warning('Exception selecting app name: %s' % e)
-                app_name = self.package
+            app_name_resource_id = string_to_int(app_name, base=16)
+            app_name = self.package
+            if app_name_resource_id:
+                try:
+                    app_name = \
+                        self.android_resource.get_resolved_res_configs(
+                            app_name_resource_id,
+                            ARSCResTableConfig.default_config())[0][1]
+                except Exception as e:
+                    self.log.warning(
+                        'Exception selecting app name: {}'.format(str(e)))
         return app_name
 
     @property

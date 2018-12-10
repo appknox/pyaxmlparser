@@ -97,3 +97,14 @@ def format_value(_type, _data, lookup_string=lambda ix: '<string>'):
         return '%d' % long_to_int(_data)
 
     return '<0x%X, type 0x%02X>' % (_data, _type)
+
+
+def string_to_int(target_string=None, base=10):
+    result = None
+    if isinstance(target_string, string_types):
+        number_symbols = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
+        try:
+            result = int('0' + ''.join([x for x in target_string if x in number_symbols]), base)
+        except ValueError:
+            pass
+    return result
