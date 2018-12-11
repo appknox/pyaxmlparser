@@ -93,5 +93,6 @@ Python package :
     apk_path = '/foo/bar.apk'
     with open(apk_path, 'rb') as apk_file:
         android_xml = apk_file.read()
-        xml = AXMLPrinter(android_xml).get_xml_obj()
-        print(xml.get('package'))
+        xml, error = AXMLPrinter(android_xml).get_xml_obj()
+        if xml is not None:
+            print(xml.get('package'))

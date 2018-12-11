@@ -18,6 +18,7 @@
 from __future__ import unicode_literals
 import logging
 from struct import unpack
+import unicodedata
 
 from pyaxmlparser.utils import is_python_3
 
@@ -106,12 +107,14 @@ class StringBlock(object):
             return ''
 
         offset = self.string_offsets[idx]
-
         if self.is_utf8:
-            self._cache[idx] = self.decode_utf8(offset)
+            value = self.decode_utf8(offset)
         else:
-            self._cache[idx] = self.decode_utf16(offset)
+            value = self.decode_utf16(offset)
 
+        # Remove all control symbol https://www.compart.com/en/unicode/category/Cc
+        # fix function _escape from axmlprinter
+        self._cache[idx] = ''.join(c if unicodedata.category(c) != 'Cc' else '' for c in value)
         return self._cache[idx]
 
     def get_style(self, idx):

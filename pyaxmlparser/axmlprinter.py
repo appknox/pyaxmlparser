@@ -22,13 +22,16 @@ from pyaxmlparser.utils import format_value
 import pyaxmlparser.constants as const
 from xml.sax.saxutils import escape
 
+
 try:
     from lxml import etree
+    from lxml.etree import ParseError
     lxml_installed = True
 except ImportError:
     lxml_installed = False
 if not lxml_installed:
     import xml.etree.ElementTree as etree
+    from xml.etree.ElementTree import ParseError
 
 
 class AXMLPrinter(object):
@@ -82,9 +85,6 @@ class AXMLPrinter(object):
     # FIXME should this be applied for strings directly?
     @staticmethod
     def _escape(s):
-        # FIXME Strings might contain null bytes. Should they be removed?
-        # We guess so, as normally the string would terminate there...?!
-        s = s.replace('\x00', '')
         # Other HTML Conversions
         s = s.replace('&', '&amp;')
         s = s.replace('"', '&quot;')
@@ -110,24 +110,62 @@ class AXMLPrinter(object):
         Get the XML as an UTF-8 string
         :return: str
         """
+        xml, error = self.get_xml_obj()
+
         if lxml_installed:
-            return etree.tostring(
-                self.get_xml_obj(), encoding='utf-8', pretty_print=True)
-        return etree.tostring(
-            self.get_xml_obj(), encoding='utf-8')
+            pretty_xml = etree.tostring(xml, encoding='utf-8', pretty_print=True)
+        else:
+            self.indent(xml)  # added pretty print
+            pretty_xml = etree.tostring(
+                xml, encoding='utf-8')
+        return pretty_xml
+
+    def indent(self, elem, level=0):
+        i = "\n" + level * "  "
+        if len(elem):
+            if not elem.text or not elem.text.strip():
+                elem.text = i + "  "
+            if not elem.tail or not elem.tail.strip():
+                elem.tail = i
+            for elem in elem:
+                self.indent(elem, level+1)
+            if not elem.tail or not elem.tail.strip():
+                elem.tail = i
+        else:
+            if level and (not elem.tail or not elem.tail.strip()):
+                elem.tail = i
 
     def get_xml_obj(self):
         """
         Get the XML as an ElementTree object
-        :return: :class:`~lxml.etree.Element`
+        :return: :class:`etree.Element`
         """
+
+        error = ''
+        xml_string = self.get_buff()
+        tree = None
         if lxml_installed:
             parser = etree.XMLParser(recover=True, resolve_entities=False)
-            tree = etree.fromstring(self.get_buff(), parser=parser)
+            try:
+                tree = etree.fromstring(xml_string, parser=parser)
+            except ParseError as error_message:
+                error = 'Error message: {}\n  code {}\n  position {}\n\n {}'.format(
+                    str(error_message),
+                    error_message.code if hasattr(error_message, 'code') else 'no code',
+                    error_message.position if hasattr(error_message, 'position') else 'no position',
+                    xml_string)
         else:
             # if error xml - need patch )
-            tree = etree.fromstring(self.get_buff())
-        return tree
+            try:
+                tree = etree.fromstring(xml_string)
+            except ParseError as error_message:
+                error = 'Error message: {}\n  code {}\n  position {}\n\n {}'.format(
+                    str(error_message),
+                    error_message.code if hasattr(error_message, 'code') else 'no code',
+                    error_message.position if hasattr(error_message, 'position') else 'no position',
+                    xml_string)
+
+        return tree, error
 
     @staticmethod
     def get_prefix(prefix):

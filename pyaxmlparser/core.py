@@ -13,12 +13,15 @@ class APK:
         self.log.setLevel(logging.DEBUG if debug else logging.CRITICAL)
         self.apk = apk
         self.zip_file = get_zip_file(apk)
-        assert 'AndroidManifest.xml' in self.zip_file.namelist()
+        name_list = self.zip_file.namelist()
+        assert 'AndroidManifest.xml' in name_list
         self.android_xml = AXMLPrinter(
             self.zip_file.read('AndroidManifest.xml'), debug=debug)
-        self.xml = self.android_xml.get_xml_obj()
+        xml, error = self.android_xml.get_xml_obj()
+        assert error == '', error
+        self.xml = xml
         self.android_resource = None
-        if 'resources.arsc' in self.zip_file.namelist():
+        if 'resources.arsc' in name_list:
             self.android_resource = ARSCParser(
                 self.zip_file.read('resources.arsc'), debug=debug)
 

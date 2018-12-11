@@ -12,7 +12,8 @@ def test_app_name_extraction():
     with open(axml_file, 'rb') as manifest_file, open(rsc_file, 'rb') as resources_file:
         manifest_data = manifest_file.read()
         resources_data = resources_file.read()
-        axml = AXMLPrinter(manifest_data).get_xml_obj()
+        axml, error = AXMLPrinter(manifest_data).get_xml_obj()
+        assert error == '', 'Error parse xml {}: \n{}'.format(axml_file, error)
         rsc = ARSCParser(resources_data)
 
         app_name_label = axml.findall('.//application')[0].get(NS_ANDROID + 'label')
