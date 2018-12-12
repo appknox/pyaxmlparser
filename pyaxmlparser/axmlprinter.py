@@ -21,6 +21,7 @@ from pyaxmlparser.axmlparser import AXMLParser
 from pyaxmlparser.utils import format_value
 import pyaxmlparser.constants as const
 from xml.sax.saxutils import escape
+from xml.dom.minidom import parseString
 
 
 try:
@@ -115,25 +116,11 @@ class AXMLPrinter(object):
         if lxml_installed:
             pretty_xml = etree.tostring(xml, encoding='utf-8', pretty_print=True)
         else:
-            self.indent(xml)  # added pretty print
-            pretty_xml = etree.tostring(
-                xml, encoding='utf-8')
-        return pretty_xml
+            xml_string = etree.tostring(xml, encoding='utf-8')
+            raw_xml = parseString(xml_string)
+            pretty_xml = raw_xml.toprettyxml(encoding='utf-8')
 
-    def indent(self, elem, level=0):
-        i = "\n" + level * "  "
-        if len(elem):
-            if not elem.text or not elem.text.strip():
-                elem.text = i + "  "
-            if not elem.tail or not elem.tail.strip():
-                elem.tail = i
-            for elem in elem:
-                self.indent(elem, level+1)
-            if not elem.tail or not elem.tail.strip():
-                elem.tail = i
-        else:
-            if level and (not elem.tail or not elem.tail.strip()):
-                elem.tail = i
+        return pretty_xml
 
     def get_xml_obj(self):
         """
