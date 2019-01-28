@@ -14,6 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import unicode_literals
 
 import logging
 from pyaxmlparser import bytecode
@@ -23,17 +24,18 @@ from pyaxmlparser.arscutil import ARSCHeader, ARSCResTablePackage, \
     ARSCResTypeSpec, ARSCResType, ARSCResTableEntry, ARSCResTableConfig
 from pyaxmlparser.stringblock import StringBlock
 import pyaxmlparser.constants as const
-from pyaxmlparser.utils import complexToFloat
+from pyaxmlparser.utils import complex_to_float
 from xml.sax.saxutils import escape
-
-log = logging.getLogger("pyaxmlparser.arscparser")
 
 
 class ARSCParser(object):
     """
     Parser for resource.arsc files
     """
-    def __init__(self, raw_buff):
+    def __init__(self, raw_buff, debug=False):
+        self.log = logging.getLogger('pyaxmlparser.arscparser')
+        self.log.setLevel(logging.DEBUG if debug else logging.CRITICAL)
+
         self.analyzed = False
         self._resolved_strings = None
         self.buff = bytecode.BuffHandle(raw_buff)
@@ -47,7 +49,7 @@ class ARSCParser(object):
         self.resource_configs = collections.defaultdict(lambda: collections.defaultdict(set))
         self.resource_keys = collections.defaultdict(
             lambda: collections.defaultdict(collections.defaultdict))
-        self.stringpool_main = None
+        self.string_pool_main = None
 
         # skip to the start of the first chunk
         self.buff.set_idx(self.header.start + self.header.header_size)
@@ -61,11 +63,11 @@ class ARSCParser(object):
                 # this inner chunk crosses the boundary of the table chunk
                 break
 
-            if res_header.type == const.RES_STRING_POOL_TYPE and not self.stringpool_main:
-                self.stringpool_main = StringBlock(self.buff, res_header)
+            if res_header.type == const.RES_STRING_POOL_TYPE and not self.string_pool_main:
+                self.string_pool_main = StringBlock(self.buff, res_header)
 
             elif res_header.type == const.RES_TABLE_PACKAGE_TYPE:
-                assert len(self.packages) < self.packageCount, "Got more packages than expected"
+                assert len(self.packages) < self.packageCount, 'Got more packages than expected'
 
                 current_package = ARSCResTablePackage(self.buff, res_header)
                 package_name = current_package.get_name()
@@ -77,23 +79,23 @@ class ARSCParser(object):
                 self.buff.set_idx(current_package.header.start + current_package.typeStrings)
                 type_sp_header = ARSCHeader(self.buff)
                 assert type_sp_header.type == const.RES_STRING_POOL_TYPE, \
-                    "Expected String Pool header, got %x" % type_sp_header.type
-                mTableStrings = StringBlock(self.buff, type_sp_header)
+                    'Expected String Pool header, got %x' % type_sp_header.type
+                table_strings = StringBlock(self.buff, type_sp_header)
 
                 # Next, we should have the resource key symbol table
                 self.buff.set_idx(current_package.header.start + current_package.keyStrings)
                 key_sp_header = ARSCHeader(self.buff)
                 assert key_sp_header.type == const.RES_STRING_POOL_TYPE, \
-                    "Expected String Pool header, got %x" % key_sp_header.type
-                mKeyStrings = StringBlock(self.buff, key_sp_header)
+                    'Expected String Pool header, got %x' % key_sp_header.type
+                key_strings = StringBlock(self.buff, key_sp_header)
 
                 # Add them to the dict of read packages
                 self.packages[package_name].append(current_package)
-                self.packages[package_name].append(mTableStrings)
-                self.packages[package_name].append(mKeyStrings)
+                self.packages[package_name].append(table_strings)
+                self.packages[package_name].append(key_strings)
 
-                pc = PackageContext(current_package, self.stringpool_main,
-                                    mTableStrings, mKeyStrings)
+                pc = PackageContext(current_package, self.string_pool_main,
+                                    table_strings, key_strings)
 
                 # skip to the first header in this table package chunk
                 # FIXME is this correct? We have already read the first two sections!
@@ -104,7 +106,7 @@ class ARSCParser(object):
                 # Read all other headers
                 while self.buff.get_idx() <= package_data_end - ARSCHeader.SIZE:
                     pkg_chunk_header = ARSCHeader(self.buff)
-                    log.debug("Found a header: {}".format(pkg_chunk_header))
+                    self.log.debug('Found a header: {}'.format(pkg_chunk_header))
                     if pkg_chunk_header.start + pkg_chunk_header.size > package_data_end:
                         # we are way off the package chunk; bail out
                         break
@@ -119,12 +121,12 @@ class ARSCParser(object):
                         self.packages[package_name].append(a_res_type)
                         self.resource_configs[package_name][a_res_type].add(a_res_type.config)
 
-                        log.debug("Config: {}".format(a_res_type.config))
+                        self.log.debug('Config: {}'.format(a_res_type.config))
 
                         entries = []
                         for i in range(0, a_res_type.entryCount):
-                            current_package.mResId = current_package.mResId & 0xffff0000 | i
-                            entries.append((unpack('<i', self.buff.read(4))[0], current_package.mResId))
+                            current_package.resource_id = current_package.resource_id & 0xffff0000 | i
+                            entries.append((unpack('<i', self.buff.read(4))[0], current_package.resource_id))
 
                         self.packages[package_name].append(entries)
 
@@ -145,7 +147,7 @@ class ARSCParser(object):
                                     # Not sure if this is a good solution though
                                     self.buff.set_idx(ate.start)
                     elif pkg_chunk_header.type == const.RES_TABLE_LIBRARY_TYPE:
-                        log.warning("RES_TABLE_LIBRARY_TYPE chunk is not supported")
+                        self.log.warning('RES_TABLE_LIBRARY_TYPE chunk is not supported')
                     else:
                         # silently skip other chunk types
                         pass
@@ -168,100 +170,105 @@ class ARSCParser(object):
             nb = 3
             while nb < len(self.packages[package_name]):
                 header = self.packages[package_name][nb]
-                if isinstance(header, ARSCHeader):
-                    if header.type == const.RES_TABLE_TYPE_TYPE:
-                        a_res_type = self.packages[package_name][nb + 1]
+                if not (isinstance(header, ARSCHeader) and
+                        header.type == const.RES_TABLE_TYPE_TYPE):
+                    nb += 1
+                    continue
 
-                        language = a_res_type.config.get_language()
-                        region = a_res_type.config.get_country()
-                        if region == "\x00\x00":
-                            locale = language
-                        else:
-                            locale = "{}-r{}".format(language, region)
+                a_res_type = self.packages[package_name][nb + 1]
+                language = a_res_type.config.get_language()
+                region = a_res_type.config.get_country()
+                if region == '\x00\x00':
+                    locale = language
+                else:
+                    locale = '{}-r{}'.format(language, region)
 
-                        c_value = self.values[package_name].setdefault(
-                            locale, {"public": []})
+                c_value = self.values[package_name].setdefault(
+                    locale, {'public': []})
 
-                        entries = self.packages[package_name][nb + 2]
-                        nb_i = 0
-                        for entry, res_id in entries:
-                            if entry != -1:
-                                ate = self.packages[package_name][nb + 3 + nb_i]
+                entries = self.packages[package_name][nb + 2]
+                nb_i = 0
+                for entry, res_id in entries:
+                    if entry == -1:
+                        continue
+                    ate = self.packages[package_name][nb + 3 + nb_i]
 
-                                self.resource_values[ate.mResId][a_res_type.config] = ate
-                                self.resource_keys[
-                                    package_name
-                                ][
-                                    a_res_type.get_type()
-                                ][
-                                    ate.get_value()
-                                ] = ate.mResId
+                    self.resource_values[
+                        ate.resource_id][a_res_type.config] = ate
+                    self.resource_keys[package_name][
+                        a_res_type.get_type()][ate.get_value()] = \
+                        ate.resource_id
 
-                                if ate.get_index() != -1:
-                                    c_value["public"].append(
-                                        (a_res_type.get_type(), ate.get_value(),
-                                         ate.mResId))
+                    if ate.get_index() != -1:
+                        c_value['public'].append(
+                            (a_res_type.get_type(), ate.get_value(),
+                             ate.resource_id))
 
-                                if a_res_type.get_type() not in c_value:
-                                    c_value[a_res_type.get_type()] = []
+                    if a_res_type.get_type() not in c_value:
+                        c_value[a_res_type.get_type()] = []
 
-                                if a_res_type.get_type() == "string":
-                                    c_value["string"].append(
-                                        self.get_resource_string(ate))
+                    if a_res_type.get_type() == 'string':
+                        c_value['string'].append(
+                            self.get_resource_string(ate))
 
-                                elif a_res_type.get_type() == "id":
-                                    if not ate.is_complex():
-                                        c_value["id"].append(
-                                            self.get_resource_id(ate))
+                    elif a_res_type.get_type() == 'id':
+                        if not ate.is_complex():
+                            c_value['id'].append(
+                                self.get_resource_id(ate))
 
-                                elif a_res_type.get_type() == "bool":
-                                    if not ate.is_complex():
-                                        c_value["bool"].append(
-                                            self.get_resource_bool(ate))
+                    elif a_res_type.get_type() == 'bool':
+                        if not ate.is_complex():
+                            c_value['bool'].append(
+                                self.get_resource_bool(ate))
 
-                                elif a_res_type.get_type() == "integer":
-                                    c_value["integer"].append(
-                                        self.get_resource_integer(ate))
+                    elif a_res_type.get_type() == 'integer':
+                        c_value['integer'].append(
+                            self.get_resource_integer(ate))
 
-                                elif a_res_type.get_type() == "color":
-                                    c_value["color"].append(
-                                        self.get_resource_color(ate))
+                    elif a_res_type.get_type() == 'color':
+                        c_value['color'].append(
+                            self.get_resource_color(ate))
 
-                                elif a_res_type.get_type() == "dimen":
-                                    c_value["dimen"].append(
-                                        self.get_resource_dimen(ate))
+                    elif a_res_type.get_type() == 'dimen':
+                        c_value['dimen'].append(
+                            self.get_resource_dimen(ate))
 
-                                nb_i += 1
-                        nb += 3 + nb_i - 1  # -1 to account for the nb+=1 on the next line
-                nb += 1
+                    nb_i += 1
+                # -1 to account for the nb+=1 on the next line
+                nb += 3 + nb_i - 1
 
-    def get_resource_string(self, ate):
+    @staticmethod
+    def get_resource_string(ate):
         return [ate.get_value(), ate.get_key_data()]
 
-    def get_resource_id(self, ate):
+    @staticmethod
+    def get_resource_id(ate):
         x = [ate.get_value()]
         if ate.key.get_data() == 0:
-            x.append("false")
+            x.append('false')
         elif ate.key.get_data() == 1:
-            x.append("true")
+            x.append('true')
         return x
 
-    def get_resource_bool(self, ate):
+    @staticmethod
+    def get_resource_bool(ate):
         x = [ate.get_value()]
         if ate.key.get_data() == 0:
-            x.append("false")
+            x.append('false')
         elif ate.key.get_data() == -1:
-            x.append("true")
+            x.append('true')
         return x
 
-    def get_resource_integer(self, ate):
+    @staticmethod
+    def get_resource_integer(ate):
         return [ate.get_value(), ate.key.get_data()]
 
-    def get_resource_color(self, ate):
+    @staticmethod
+    def get_resource_color(ate):
         entry_data = ate.key.get_data()
         return [
             ate.get_value(),
-            "#%02x%02x%02x%02x" % (
+            '#%02x%02x%02x%02x' % (
                 ((entry_data >> 24) & 0xFF),
                 ((entry_data >> 16) & 0xFF),
                 ((entry_data >> 8) & 0xFF),
@@ -271,19 +278,20 @@ class ARSCParser(object):
     def get_resource_dimen(self, ate):
         try:
             return [
-                ate.get_value(), "%s%s" % (
-                    complexToFloat(ate.key.get_data()),
+                ate.get_value(), '%s%s' % (
+                    complex_to_float(ate.key.get_data()),
                     const.DIMENSION_UNITS[ate.key.get_data() & const.COMPLEX_UNIT_MASK])
             ]
         except IndexError:
-            log.warning("Out of range dimension unit index for %s: %s" % (
-                complexToFloat(ate.key.get_data()),
+            self.log.warning('Out of range dimension unit index for %s: %s' % (
+                complex_to_float(ate.key.get_data()),
                 ate.key.get_data() & const.COMPLEX_UNIT_MASK))
             return [ate.get_value(), ate.key.get_data()]
 
     # FIXME
-    def get_resource_style(self, ate):
-        return ["", ""]
+    @staticmethod
+    def get_resource_style(ate):
+        return ['', '']
 
     def get_packages_names(self):
         """
@@ -320,11 +328,10 @@ class ARSCParser(object):
 
         self._analyse()
 
-        buff = '<?xml version="1.0" encoding="utf-8"?>\n'
-        buff += '<resources>\n'
+        buff = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
 
         try:
-            for i in self.values[package_name][locale]["public"]:
+            for i in self.values[package_name][locale]['public']:
                 buff += '<public type="%s" name="%s" id="0x%08x" />\n' % (
                     i[0], i[1], i[2])
         except KeyError:
@@ -344,11 +351,10 @@ class ARSCParser(object):
         """
         self._analyse()
 
-        buff = '<?xml version="1.0" encoding="utf-8"?>\n'
-        buff += '<resources>\n'
+        buff = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
 
         try:
-            for i in self.values[package_name][locale]["string"]:
+            for i in self.values[package_name][locale]['string']:
                 if any(map(i[1].__contains__, '<&>')):
                     value = '<![CDATA[%s]]>' % i[1]
                 else:
@@ -369,28 +375,23 @@ class ARSCParser(object):
         """
         self._analyse()
 
-        buff = '<?xml version="1.0" encoding="utf-8"?>\n'
-
-        buff += "<packages>\n"
+        buff = '<?xml version="1.0" encoding="utf-8"?>\n<packages>\n'
         for package_name in self.get_packages_names():
-            buff += "<package name=\"%s\">\n" % package_name
+            buff += '<package name=\"%s\">\n' % package_name
 
             for locale in self.get_locales(package_name):
-                buff += "<locale value=%s>\n" % repr(locale)
-
-                buff += '<resources>\n'
+                buff += '<locale value=%s>\n<resources>\n' % repr(locale)
                 try:
-                    for i in self.values[package_name][locale]["string"]:
+                    for i in self.values[package_name][locale]['string']:
                         buff += '<string name="%s">%s</string>\n' % (i[0], escape(i[1]))
                 except KeyError:
                     pass
 
-                buff += '</resources>\n'
-                buff += '</locale>\n'
+                buff += '</resources>\n</locale>\n'
 
-            buff += "</package>\n"
+            buff += '</package>\n'
 
-        buff += "</packages>\n"
+        buff += '</packages>\n'
 
         return buff.encode('utf-8')
 
@@ -404,11 +405,10 @@ class ARSCParser(object):
         """
         self._analyse()
 
-        buff = '<?xml version="1.0" encoding="utf-8"?>\n'
-        buff += '<resources>\n'
+        buff = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
 
         try:
-            for i in self.values[package_name][locale]["id"]:
+            for i in self.values[package_name][locale]['id']:
                 if len(i) == 1:
                     buff += '<item type="id" name="%s"/>\n' % (i[0])
                 else:
@@ -431,11 +431,10 @@ class ARSCParser(object):
         """
         self._analyse()
 
-        buff = '<?xml version="1.0" encoding="utf-8"?>\n'
-        buff += '<resources>\n'
+        buff = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
 
         try:
-            for i in self.values[package_name][locale]["bool"]:
+            for i in self.values[package_name][locale]['bool']:
                 buff += '<bool name="%s">%s</bool>\n' % (i[0], i[1])
         except KeyError:
             pass
@@ -454,11 +453,10 @@ class ARSCParser(object):
         """
         self._analyse()
 
-        buff = '<?xml version="1.0" encoding="utf-8"?>\n'
-        buff += '<resources>\n'
+        buff = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
 
         try:
-            for i in self.values[package_name][locale]["integer"]:
+            for i in self.values[package_name][locale]['integer']:
                 buff += '<integer name="%s">%s</integer>\n' % (i[0], i[1])
         except KeyError:
             pass
@@ -477,11 +475,10 @@ class ARSCParser(object):
         """
         self._analyse()
 
-        buff = '<?xml version="1.0" encoding="utf-8"?>\n'
-        buff += '<resources>\n'
+        buff = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
 
         try:
-            for i in self.values[package_name][locale]["color"]:
+            for i in self.values[package_name][locale]['color']:
                 buff += '<color name="%s">%s</color>\n' % (i[0], i[1])
         except KeyError:
             pass
@@ -500,11 +497,10 @@ class ARSCParser(object):
         """
         self._analyse()
 
-        buff = '<?xml version="1.0" encoding="utf-8"?>\n'
-        buff += '<resources>\n'
+        buff = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
 
         try:
-            for i in self.values[package_name][locale]["dimen"]:
+            for i in self.values[package_name][locale]['dimen']:
                 buff += '<dimen name="%s">%s</dimen>\n' % (i[0], i[1])
         except KeyError:
             pass
@@ -517,7 +513,7 @@ class ARSCParser(object):
         self._analyse()
 
         try:
-            for i in self.values[package_name][locale]["public"]:
+            for i in self.values[package_name][locale]['public']:
                 if i[2] == rid:
                     return i
         except KeyError:
@@ -584,7 +580,7 @@ class ARSCParser(object):
                 r[package_name][v_locale] = {}
 
                 try:
-                    for i in self.values[package_name][locale]["public"]:
+                    for i in self.values[package_name][locale]['public']:
                         if i[0] == 'string':
                             r[package_name][v_locale][i[2]] = None
                             k[i[1]] = i[2]
@@ -592,7 +588,7 @@ class ARSCParser(object):
                     pass
 
                 try:
-                    for i in self.values[package_name][locale]["string"]:
+                    for i in self.values[package_name][locale]['string']:
                         if i[0] in k:
                             r[package_name][v_locale][k[i[0]]] = i[1]
                 except KeyError:
@@ -627,12 +623,12 @@ given result.
         self._analyse()
 
         if not rid:
-            raise ValueError("'rid' should be set")
+            raise ValueError('\'rid\' should be set')
         if not isinstance(rid, int):
-            raise ValueError("'rid' must be an int")
+            raise ValueError('\'rid\' must be an int')
 
         if rid not in self.resource_values:
-            log.warning("The requested rid could not be found in the resources.")
+            self.log.warning('The requested rid could not be found in the resources.')
             return []
 
         res_options = self.resource_values[rid]
@@ -640,7 +636,7 @@ given result.
             if config in res_options:
                 return [(config, res_options[config])]
             elif fallback and config == ARSCResTableConfig.default_config():
-                log.warning("No default resource config could be found for the given rid, using fallback!")
+                self.log.warning('No default resource config could be found for the given rid, using fallback!')
                 return [list(self.resource_values[rid].items())[0]]
             else:
                 return []
@@ -651,7 +647,7 @@ given result.
         self._analyse()
 
         try:
-            for i in self.values[package_name][locale]["string"]:
+            for i in self.values[package_name][locale]['string']:
                 if i[0] == name:
                     return i
         except KeyError:
@@ -681,18 +677,18 @@ given result.
 
 
 class PackageContext(object):
-    def __init__(self, current_package, stringpool_main, mTableStrings,
-                 mKeyStrings):
-        self.stringpool_main = stringpool_main
-        self.mTableStrings = mTableStrings
-        self.mKeyStrings = mKeyStrings
+    def __init__(self, current_package, string_pool_main,
+                 table_strings, key_strings):
+        self.string_pool_main = string_pool_main
+        self.table_strings = table_strings
+        self.key_strings = key_strings
         self.current_package = current_package
 
-    def get_mResId(self):
-        return self.current_package.mResId
+    def get_resource_id(self):
+        return self.current_package.resource_id
 
-    def set_mResId(self, mResId):
-        self.current_package.mResId = mResId
+    def set_resource_id(self, resource_id):
+        self.current_package.resource_id = resource_id
 
     def get_package_name(self):
         return self.current_package.get_name()

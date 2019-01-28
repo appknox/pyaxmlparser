@@ -7,9 +7,9 @@ ATTRIBUTE_IX_VALUE_DATA = 4
 ATTRIBUTE_LENGHT = 5
 
 # Chunk Headers
-CHUNK_AXML_FILE = 0x00080003
+CHUNK_ANDROID_XML_FILE = 0x00080003
 CHUNK_STRING = 0x001C0001
-CHUNK_RESOURCEIDS = 0x00080180
+CHUNK_RESOURCE_IDS = 0x00080180
 CHUNK_XML_FIRST = 0x00100100
 CHUNK_XML_START_NAMESPACE = 0x00100100
 CHUNK_XML_END_NAMESPACE = 0x00100101
@@ -45,25 +45,25 @@ TYPE_LAST_COLOR_INT = 31
 TYPE_LAST_INT = 31
 
 TYPE_TABLE = {
-    TYPE_ATTRIBUTE: "attribute",
-    TYPE_DIMENSION: "dimension",
-    TYPE_FLOAT: "float",
-    TYPE_FRACTION: "fraction",
-    TYPE_INT_BOOLEAN: "int_boolean",
-    TYPE_INT_COLOR_ARGB4: "int_color_argb4",
-    TYPE_INT_COLOR_ARGB8: "int_color_argb8",
-    TYPE_INT_COLOR_RGB4: "int_color_rgb4",
-    TYPE_INT_COLOR_RGB8: "int_color_rgb8",
-    TYPE_INT_DEC: "int_dec",
-    TYPE_INT_HEX: "int_hex",
-    TYPE_NULL: "null",
-    TYPE_REFERENCE: "reference",
-    TYPE_STRING: "string",
+    TYPE_ATTRIBUTE: 'attribute',
+    TYPE_DIMENSION: 'dimension',
+    TYPE_FLOAT: 'float',
+    TYPE_FRACTION: 'fraction',
+    TYPE_INT_BOOLEAN: 'int_boolean',
+    TYPE_INT_COLOR_ARGB4: 'int_color_argb4',
+    TYPE_INT_COLOR_ARGB8: 'int_color_argb8',
+    TYPE_INT_COLOR_RGB4: 'int_color_rgb4',
+    TYPE_INT_COLOR_RGB8: 'int_color_rgb8',
+    TYPE_INT_DEC: 'int_dec',
+    TYPE_INT_HEX: 'int_hex',
+    TYPE_NULL: 'null',
+    TYPE_REFERENCE: 'reference',
+    TYPE_STRING: 'string',
 }
 
 RADIX_MULTS = [0.00390625, 3.051758E-005, 1.192093E-007, 4.656613E-010]
-DIMENSION_UNITS = ["px", "dip", "sp", "pt", "in", "mm"]
-FRACTION_UNITS = ["%", "%p"]
+DIMENSION_UNITS = ['px', 'dip', 'sp', 'pt', 'in', 'mm']
+FRACTION_UNITS = ['%', '%p']
 
 COMPLEX_UNIT_MASK = 15
 

@@ -1,28 +1,29 @@
-
+from __future__ import unicode_literals
 import logging
 from pyaxmlparser.arscparser import ARSCParser
 from pyaxmlparser.axmlprinter import AXMLPrinter
 from pyaxmlparser.arscutil import ARSCResTableConfig
-from pyaxmlparser.utils import get_zip_file, NS_ANDROID
-
-
-log = logging.getLogger("pyaxmlparser.core")
+from pyaxmlparser.utils import get_zip_file, NS_ANDROID, string_to_int
 
 
 class APK:
 
-    def __init__(self, apk):
+    def __init__(self, apk, debug=False):
+        self.log = logging.getLogger('pyaxmlparser.core')
+        self.log.setLevel(logging.DEBUG if debug else logging.CRITICAL)
         self.apk = apk
         self.zip_file = get_zip_file(apk)
-        self.validate()
-        self.axml = AXMLPrinter(self.zip_file.read('AndroidManifest.xml'))
-        self.xml = self.axml.get_xml_obj()
-        self.arsc = ARSCParser(self.zip_file.read('resources.arsc'))
-
-    def validate(self):
-        zip_files = set(self.zip_file.namelist())
-        required_files = {'AndroidManifest.xml', 'resources.arsc'}
-        assert required_files.issubset(zip_files)
+        name_list = self.zip_file.namelist()
+        assert 'AndroidManifest.xml' in name_list
+        self.android_xml = AXMLPrinter(
+            self.zip_file.read('AndroidManifest.xml'), debug=debug)
+        xml, error = self.android_xml.get_xml_obj()
+        assert error == '', error
+        self.xml = xml
+        self.android_resource = None
+        if 'resources.arsc' in name_list:
+            self.android_resource = ARSCParser(
+                self.zip_file.read('resources.arsc'), debug=debug)
 
     def get_element(self, tag_name, attribute, **attribute_filter):
         """
@@ -61,14 +62,14 @@ class APK:
         :return:
         """
         if len(value) > 0:
-            if value[0] == ".":
+            if value[0] == '.':
                 value = self.package + value
             else:
-                v_dot = value.find(".")
+                v_dot = value.find('.')
                 if v_dot == 0:
-                    value = self.package + "." + value
+                    value = self.package + '.' + value
                 elif v_dot == -1:
-                    value = self.package + "." + value
+                    value = self.package + '.' + value
         return value
 
     def get_main_activity(self):
@@ -80,26 +81,26 @@ class APK:
         x = set()
         y = set()
 
-        activities_and_aliases = self.xml.findall(".//activity") + \
-            self.xml.findall(".//activity-alias")
+        activities_and_aliases = self.xml.findall('.//activity') + \
+            self.xml.findall('.//activity-alias')
 
         for item in activities_and_aliases:
             # Some applications have more than one MAIN activity.
             # For example: paid and free content
-            activityEnabled = item.get(NS_ANDROID + "enabled")
-            if activityEnabled is not None and \
-                    activityEnabled != "" and activityEnabled == "false":
+            activity_enabled = item.get(NS_ANDROID + 'enabled')
+            if activity_enabled is not None and \
+                    activity_enabled != '' and activity_enabled == 'false':
                 continue
 
-            for sitem in item.findall(".//action"):
-                val = sitem.get(NS_ANDROID + "name")
-                if val == "android.intent.action.MAIN":
-                    x.add(item.get(NS_ANDROID + "name"))
+            for action_item in item.findall('.//action'):
+                value = action_item.get(NS_ANDROID + 'name')
+                if value == 'android.intent.action.MAIN':
+                    x.add(item.get(NS_ANDROID + 'name'))
 
-            for sitem in item.findall(".//category"):
-                val = sitem.get(NS_ANDROID + "name")
-                if val == "android.intent.category.LAUNCHER":
-                    y.add(item.get(NS_ANDROID + "name"))
+            for category_item in item.findall('.//category'):
+                value = category_item.get(NS_ANDROID + 'name')
+                if value == 'android.intent.category.LAUNCHER':
+                    y.add(item.get(NS_ANDROID + 'name'))
 
         z = x.intersection(y)
         if len(z) > 0:
@@ -123,29 +124,30 @@ class APK:
             app_name = self.get_element(
                 'activity', 'label', name=main_activity_name)
 
-        if app_name is None:
+        if app_name is None or self.android_resource is None:
             # No App name set
-            # TODO return packagename instead?
+            # TODO return package name instead?
             return self.package
-        if app_name.startswith("@"):
-            res_id = int(app_name[1:], 16)
-            res_parser = self.arsc
-
-            try:
-                app_name = res_parser.get_resolved_res_configs(
-                    res_id,
-                    ARSCResTableConfig.default_config())[0][1]
-            except Exception as e:
-                log.warning("Exception selecting app name: %s" % e)
-                app_name = self.package
+        if app_name.startswith('@'):
+            app_name_resource_id = string_to_int(app_name, base=16)
+            app_name = self.package
+            if app_name_resource_id:
+                try:
+                    app_name = \
+                        self.android_resource.get_resolved_res_configs(
+                            app_name_resource_id,
+                            ARSCResTableConfig.default_config())[0][1]
+                except Exception as e:
+                    self.log.warning(
+                        'Exception selecting app name: {}'.format(str(e)))
         return app_name
 
     @property
     def version_name(self):
-        version_name = self.xml.get(NS_ANDROID + "versionName")
+        version_name = self.xml.get(NS_ANDROID + 'versionName')
         if not version_name:
-            return ""
-        if not version_name.startswith("@"):
+            return ''
+        if not version_name.startswith('@'):
             return version_name
         rsc = self.get_resource(version_name, self.package)
         if rsc:
@@ -153,23 +155,41 @@ class APK:
         return version_name
 
     def get_resource(self, key, value):
-        try:
-            key = '0x' + key[1:]
-            hex_value = self.arsc.get_id(value, int(key, 0))[1]
-            rsc = self.arsc.get_string(value, hex_value)[1]
-        except Exception as e:
-            log.warning(str(e))
-            rsc = None
+        rsc = None
+        if self.android_resource is not None:
+            try:
+                key = '0x' + key[1:]
+                hex_value = self.android_resource.get_id(value, int(key, 0))[1]
+                rsc = self.android_resource.get_string(value, hex_value)[1]
+            except Exception as e:
+                self.log.warning(str(e))
         return rsc
 
     @property
     def version_code(self):
-        version_code = self.xml.get(NS_ANDROID + "versionCode")
-        return version_code
+        version_code = self.xml.get(NS_ANDROID + 'versionCode')
+        return version_code if version_code else 1
 
     @property
     def package(self):
-        return self.xml.get("package")
+        return self.xml.get('package')
+
+    @property
+    def platform_build_version_code(self):
+        platform_build_version_code_value = \
+            self.xml.get('platformBuildVersionCode')
+        if not platform_build_version_code_value:
+            platform_build_version_code_value = \
+                self.get_min_sdk_version
+        return platform_build_version_code_value
+
+    @property
+    def platform_build_version_name(self):
+        platform_build_version_name_value = \
+            self.xml.get('platformBuildVersionName')
+        if not platform_build_version_name_value:
+            platform_build_version_name_value = ''
+        return platform_build_version_name_value
 
     @property
     def icon_info(self):
@@ -177,9 +197,9 @@ class APK:
         app = self.xml.findall('.//application')[0]
         app_icon = app.get(NS_ANDROID + 'icon')[1:]
 
-        if app_icon:
+        if app_icon and self.android_resource is not None:
             icon_id = int('0x' + app_icon, 0)
-            icon_data = self.arsc.get_id(self.package, icon_id)
+            icon_data = self.android_resource.get_id(self.package, icon_id)
             if icon_data:
                 icon_type, icon_name = icon_data[0], icon_data[1]
         return icon_type, icon_name
@@ -195,25 +215,25 @@ class APK:
         if not app_icon:
             app_icon = self.get_element('application', 'icon')
 
-        if not app_icon:
-            res_id = self.arsc.get_res_id_by_key(
+        if not app_icon and self.android_resource is not None:
+            res_id = self.android_resource.get_res_id_by_key(
                 self.package, 'mipmap', 'ic_launcher')
             if res_id:
-                app_icon = "@%x" % res_id
+                app_icon = '@%x' % res_id
 
-        if not app_icon:
-            res_id = self.arsc.get_res_id_by_key(
+        if not app_icon and self.android_resource is not None:
+            res_id = self.android_resource.get_res_id_by_key(
                 self.package, 'drawable', 'ic_launcher')
             if res_id:
-                app_icon = "@%x" % res_id
+                app_icon = '@%x' % res_id
 
         if not app_icon:
             # If the icon can not be found, return now
             return None
 
-        if app_icon.startswith("@"):
+        if app_icon.startswith('@') and self.android_resource is not None:
             res_id = int(app_icon[1:], 16)
-            res_parser = self.arsc
+            res_parser = self.android_resource
             candidates = res_parser.get_resolved_res_configs(res_id)
 
             app_icon = None
@@ -226,30 +246,30 @@ class APK:
                         app_icon = file_name
                         current_dpi = dpi
             except Exception as e:
-                log.warning("Exception selecting app icon: %s" % e)
+                self.log.warning('Exception selecting app icon: %s' % e)
 
         return self.zip_file.read(app_icon)
 
     @property
     def get_min_sdk_version(self):
-        return self.get_element("uses-sdk", "minSdkVersion")
+        return self.get_element('uses-sdk', 'minSdkVersion')
 
     @property
     def get_max_sdk_version(self):
-        return self.get_element("uses-sdk", "maxSdkVersion")
+        return self.get_element('uses-sdk', 'maxSdkVersion')
 
     @property
     def get_target_sdk_version(self):
-        return self.get_element("uses-sdk", "targetSdkVersion")
+        return self.get_element('uses-sdk', 'targetSdkVersion')
 
     @property
     def get_effective_target_sdk_version(self):
         """
-    Return the effective targetSdkVersion, always returns int > 0.
-    If the targetSdkVersion is not set, it defaults to 1.  This is
-    set based on defaults as defined in:
-    https://developer.android.com/guide/topics/manifest/uses-sdk-element.html
-    :rtype: int
+        Return the effective targetSdkVersion, always returns int > 0.
+        If the targetSdkVersion is not set, it defaults to 1.  This is
+        set based on defaults as defined in:
+        https://developer.android.com/guide/topics/manifest/uses-sdk-element.html
+        :rtype: int
         """
         target_sdk_version = self.get_target_sdk_version
         if not target_sdk_version:
@@ -258,3 +278,102 @@ class APK:
             return int(target_sdk_version)
         except (ValueError, TypeError):
             return 1
+
+    @property
+    def uses_permissions(self):
+        """
+        find all uses-permission and uses-permission-sdk-* example uses-permission-sdk-23
+        :return: list
+        """
+        permissions = []
+        if hasattr(self.xml, 'xpath'):
+            elements = self.xml.findall("//*[starts-with(name(), 'uses-permission')]")
+            for item in elements:
+                value = item.get(NS_ANDROID + 'name')
+                if value is not None and value not in permissions:
+                    permissions.append(value)
+        else:
+            manifest = self.xml.findall('.//manifest')
+            if manifest:
+                for item in manifest.getiterator():
+                    if item.tag.startswith('uses-permission'):
+                        value = item.get(NS_ANDROID + 'name')
+                        if value is not None and value not in permissions:
+                            permissions.append(value)
+        return permissions
+
+    @property
+    def permissions(self):
+        """
+        find permission
+        :return: list
+        """
+        permissions = []
+        elements = self.xml.findall('.//permission')
+        for item in elements:
+            value = item.get(NS_ANDROID + 'name')
+            if value is not None and value not in permissions:
+                permissions.append(value)
+        return permissions
+
+    @property
+    def all_permissions(self):
+        """
+        find all permission
+        :return: list
+        """
+        permissions = self.permissions
+        permissions.extend(self.uses_permissions)
+        return list(set(permissions))
+
+    @property
+    def uses_feature(self):
+        return self.get_uses_feature()
+
+    @property
+    def uses_feature_required(self):
+        return self.get_uses_feature(True)
+
+    @property
+    def uses_feature_non_required(self):
+        return self.get_uses_feature(False)
+
+    def get_uses_feature(self, required=None):
+        """
+        :param required: None - return all uses feature.
+        :param required: True - return all uses feature is required.
+        :param required: False - return all uses feature is not required.
+        :return:
+        """
+        uses_feature = []
+        elements = self.xml.findall('.//uses-feature')
+        for item in elements:
+            value = item.get(NS_ANDROID + 'name')
+            if value is not None and value not in uses_feature:
+                if required is None:
+                    uses_feature.append(value)
+                elif required and item.get(NS_ANDROID + 'required') == 'true':
+                    uses_feature.append(value)
+                elif not required and item.get(NS_ANDROID + 'required') == 'false':
+                    uses_feature.append(value)
+                else:
+                    continue
+        return uses_feature
+
+    @property
+    def gles_version(self):
+        return self.get_gles_version()
+
+    def get_gles_version(self):
+        gl_es_version = None
+        if hasattr(self.xml, 'xpath'):
+            result = self.xml.xpath("//uses-feature/@*[contains(name(), 'glEsVersion')]")
+            if len(result):
+                gl_es_version = result[0]
+        else:
+            elements = self.xml.findall('.//uses-feature')
+            for item in elements:
+                value = item.get(NS_ANDROID + 'glEsVersion')
+                if value:
+                    gl_es_version = value
+        return gl_es_version

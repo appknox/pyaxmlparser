@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import unicode_literals
 from struct import unpack, pack
 
 
@@ -28,7 +29,7 @@ class SV(object):
         return pack(self.__size, self.__value)
 
     def __str__(self):
-        return "0x%x" % self.__value
+        return '0x%x' % self.__value
 
     def __int__(self):
         return self.__value
@@ -76,11 +77,11 @@ def object_to_str(obj):
     if isinstance(obj, str):
         return obj
     elif isinstance(obj, bool):
-        return ""
+        return ''
     elif isinstance(obj, int):
-        return pack("<L", obj)
+        return pack('<L', obj)
     elif obj is None:
-        return ""
+        return ''
     else:
         # print type(obj), obj
         return obj.get_raw()
@@ -89,7 +90,7 @@ def object_to_str(obj):
 class MethodBC(object):
 
     def show(self, value):
-        getattr(self, "show_" + value)()
+        getattr(self, 'show_' + value)()
 
 
 class BuffHandle(object):
@@ -192,5 +193,5 @@ class _Bytecode(object):
 
     def save(self, filename):
         buff = self._save()
-        with open(filename, "w") as fd:
+        with open(filename, 'w') as fd:
             fd.write(buff)

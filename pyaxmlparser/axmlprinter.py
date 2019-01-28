@@ -15,70 +15,83 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import unicode_literals
+import logging
 from pyaxmlparser.axmlparser import AXMLParser
 from pyaxmlparser.utils import format_value
 import pyaxmlparser.constants as const
 from xml.sax.saxutils import escape
-from lxml import etree
+from xml.dom.minidom import parseString
+
+
+try:
+    from lxml import etree
+    from lxml.etree import ParseError
+    lxml_installed = True
+except ImportError:
+    lxml_installed = False
+if not lxml_installed:
+    import xml.etree.ElementTree as etree
+    from xml.etree.ElementTree import ParseError
 
 
 class AXMLPrinter(object):
     """
-    Converter for AXML Files into a XML string
+    Converter for Android XML Files into a XML string
     """
-    def __init__(self, raw_buff):
-        self.axml = AXMLParser(raw_buff)
+    def __init__(self, raw_buff, debug=False):
+        self.log = logging.getLogger('pyaxmlparser.axmlprinter')
+        self.log.setLevel(logging.DEBUG if debug else logging.CRITICAL)
+        self.android_xml = AXMLParser(raw_buff)
         self.xmlns = False
 
-        self.buff = u''
+        self.buff = ''
 
-        while True and self.axml.is_valid():
-            _type = next(self.axml)
+        while True and self.android_xml.is_valid():
+            _type = next(self.android_xml)
 
             if _type == const.START_DOCUMENT:
-                self.buff += u'<?xml version="1.0" encoding="utf-8"?>\n'
+                self.buff += '<?xml version="1.0" encoding="utf-8"?>\n'
             elif _type == const.START_TAG:
-                self.buff += u'<' + self.getPrefix(self.axml.getPrefix()) + \
-                    self.axml.getName() + u'\n'
-                self.buff += self.axml.getXMLNS()
+                self.buff += '<' + self.get_prefix(self.android_xml.get_prefix()) + \
+                    self.android_xml.get_name() + '\n'
+                self.buff += self.android_xml.get_xml_namespace()
 
-                for i in range(0, self.axml.getAttributeCount()):
-                    prefix = self.getPrefix(self.axml.getAttributePrefix(i))
-                    name = self.axml.getAttributeName(i)
-                    value = self._escape(self.getAttributeValue(i))
+                for i in range(0, self.android_xml.get_attribute_count()):
+                    prefix = self.get_prefix(self.android_xml.get_attribute_prefix(i))
+                    name = self.android_xml.get_attribute_name(i)
+                    value = self._escape(self.get_attribute_value(i))
 
                     # If the name is a system name AND the prefix is set,
                     # we have a problem.
                     # FIXME we are not sure how this happens, but a quick fix
                     # is to remove the prefix if it already in the name
                     if name.startswith(prefix):
-                        prefix = u''
+                        prefix = ''
 
-                    self.buff += u'{}{}="{}"\n'.format(prefix, name, value)
+                    self.buff += '{}{}="{}"\n'.format(prefix, name, value)
 
-                self.buff += u'>\n'
+                self.buff += '>\n'
 
             elif _type == const.END_TAG:
-                self.buff += u"</%s%s>\n" % (
-                    self.getPrefix(self.axml.getPrefix()), self.axml.getName())
+                self.buff += '</%s%s>\n' % (
+                    self.get_prefix(self.android_xml.get_prefix()), self.android_xml.get_name())
 
             elif _type == const.TEXT:
-                self.buff += u"%s\n" % self._escape(self.axml.getText())
+                self.buff += '%s\n' % self._escape(self.android_xml.get_text())
             elif _type == const.END_DOCUMENT:
                 break
 
     # pleed patch
     # FIXME should this be applied for strings directly?
-    def _escape(self, s):
-        # FIXME Strings might contain null bytes. Should they be removed?
-        # We guess so, as normaly the string would terminate there...?!
-        s = s.replace("\x00", "")
+    @staticmethod
+    def _escape(s):
         # Other HTML Conversions
-        s = s.replace("&", "&amp;")
-        s = s.replace('"', "&quot;")
-        s = s.replace("'", "&apos;")
-        s = s.replace("<", "&lt;")
-        s = s.replace(">", "&gt;")
+        s = s.replace('&', '&amp;')
+        s = s.replace('"', '&quot;')
+        s = s.replace('\'', '&apos;')
+        s = s.replace('<', '&lt;')
+        s = s.replace('>', '&gt;')
         return escape(s)
 
     def is_packed(self):
@@ -88,7 +101,7 @@ class AXMLPrinter(object):
         Parser
         :return: boolean
         """
-        return self.axml.packerwarning
+        return self.android_xml.packer_warning
 
     def get_buff(self):
         return self.buff.encode('utf-8')
@@ -98,33 +111,65 @@ class AXMLPrinter(object):
         Get the XML as an UTF-8 string
         :return: str
         """
-        return etree.tostring(
-            self.get_xml_obj(), encoding="utf-8", pretty_print=True)
+        xml, error = self.get_xml_obj()
+
+        if lxml_installed:
+            pretty_xml = etree.tostring(xml, encoding='utf-8', pretty_print=True)
+        else:
+            xml_string = etree.tostring(xml, encoding='utf-8')
+            raw_xml = parseString(xml_string)
+            pretty_xml = raw_xml.toprettyxml(encoding='utf-8')
+
+        return pretty_xml
 
     def get_xml_obj(self):
         """
         Get the XML as an ElementTree object
-        :return: :class:`~lxml.etree.Element`
+        :return: :class:`etree.Element`
         """
-        parser = etree.XMLParser(recover=True, resolve_entities=False)
-        tree = etree.fromstring(self.get_buff(), parser=parser)
-        return tree
 
-    def getPrefix(self, prefix):
+        error = ''
+        xml_string = self.get_buff()
+        tree = None
+        if lxml_installed:
+            parser = etree.XMLParser(recover=True, resolve_entities=False)
+            try:
+                tree = etree.fromstring(xml_string, parser=parser)
+            except ParseError as error_message:
+                error = 'Error message: {}\n  code {}\n  position {}\n\n {}'.format(
+                    str(error_message),
+                    error_message.code if hasattr(error_message, 'code') else 'no code',
+                    error_message.position if hasattr(error_message, 'position') else 'no position',
+                    xml_string)
+        else:
+            # if error xml - need patch )
+            try:
+                tree = etree.fromstring(xml_string)
+            except ParseError as error_message:
+                error = 'Error message: {}\n  code {}\n  position {}\n\n {}'.format(
+                    str(error_message),
+                    error_message.code if hasattr(error_message, 'code') else 'no code',
+                    error_message.position if hasattr(error_message, 'position') else 'no position',
+                    xml_string)
+
+        return tree, error
+
+    @staticmethod
+    def get_prefix(prefix):
         if prefix is None or len(prefix) == 0:
-            return u''
+            return ''
 
-        return prefix + u':'
+        return prefix + ':'
 
-    def getAttributeValue(self, index):
+    def get_attribute_value(self, index):
         """
         Wrapper function for format_value
         to resolve the actual value of an attribute in a tag
         :param index:
         :return:
         """
-        _type = self.axml.getAttributeValueType(index)
-        _data = self.axml.getAttributeValueData(index)
+        _type = self.android_xml.get_attribute_value_type(index)
+        _data = self.android_xml.get_attribute_value_data(index)
 
         return format_value(
-            _type, _data, lambda _: self.axml.getAttributeValue(index))
+            _type, _data, lambda _: self.android_xml.get_attribute_value(index))
