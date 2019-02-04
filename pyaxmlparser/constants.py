@@ -1,3 +1,80 @@
+# Type definiton for (type, data) tuples representing a value
+# See http://androidxref.com/9.0.0_r3/xref/frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h#262
+
+# The 'data' is either 0 or 1, specifying this resource is either
+# undefined or empty, respectively.
+TYPE_NULL = 0x00
+# The 'data' holds a ResTable_ref, a reference to another resource
+# table entry.
+TYPE_REFERENCE = 0x01
+# The 'data' holds an attribute resource identifier.
+TYPE_ATTRIBUTE = 0x02
+# The 'data' holds an index into the containing resource table's
+# global value string pool.
+TYPE_STRING = 0x03
+# The 'data' holds a single-precision floating point number.
+TYPE_FLOAT = 0x04
+# The 'data' holds a complex number encoding a dimension value
+# such as "100in".
+TYPE_DIMENSION = 0x05
+# The 'data' holds a complex number encoding a fraction of a
+# container.
+TYPE_FRACTION = 0x06
+# The 'data' holds a dynamic ResTable_ref, which needs to be
+# resolved before it can be used like a TYPE_REFERENCE.
+TYPE_DYNAMIC_REFERENCE = 0x07
+# The 'data' holds an attribute resource identifier, which needs to be resolved
+# before it can be used like a TYPE_ATTRIBUTE.
+TYPE_DYNAMIC_ATTRIBUTE = 0x08
+# Beginning of integer flavors...
+TYPE_FIRST_INT = 0x10
+# The 'data' is a raw integer value of the form n..n.
+TYPE_INT_DEC = 0x10
+# The 'data' is a raw integer value of the form 0xn..n.
+TYPE_INT_HEX = 0x11
+# The 'data' is either 0 or 1, for input "false" or "true" respectively.
+TYPE_INT_BOOLEAN = 0x12
+# Beginning of color integer flavors...
+TYPE_FIRST_COLOR_INT = 0x1c
+# The 'data' is a raw integer value of the form #aarrggbb.
+TYPE_INT_COLOR_ARGB8 = 0x1c
+# The 'data' is a raw integer value of the form #rrggbb.
+TYPE_INT_COLOR_RGB8 = 0x1d
+# The 'data' is a raw integer value of the form #argb.
+TYPE_INT_COLOR_ARGB4 = 0x1e
+# The 'data' is a raw integer value of the form #rgb.
+TYPE_INT_COLOR_RGB4 = 0x1f
+# ...end of integer flavors.
+TYPE_LAST_COLOR_INT = 0x1f
+# ...end of integer flavors.
+TYPE_LAST_INT = 0x1f
+
+# Constants for ARSC Files
+# see http://androidxref.com/9.0.0_r3/xref/frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h#215
+RES_NULL_TYPE = 0x0000
+RES_STRING_POOL_TYPE = 0x0001
+RES_TABLE_TYPE = 0x0002
+RES_XML_TYPE = 0x0003
+
+RES_XML_FIRST_CHUNK_TYPE = 0x0100
+RES_XML_START_NAMESPACE_TYPE = 0x0100
+RES_XML_END_NAMESPACE_TYPE = 0x0101
+RES_XML_START_ELEMENT_TYPE = 0x0102
+RES_XML_END_ELEMENT_TYPE = 0x0103
+RES_XML_CDATA_TYPE = 0x0104
+RES_XML_LAST_CHUNK_TYPE = 0x017f
+
+RES_XML_RESOURCE_MAP_TYPE = 0x0180
+
+RES_TABLE_PACKAGE_TYPE = 0x0200
+RES_TABLE_TYPE_TYPE = 0x0201
+RES_TABLE_TYPE_SPEC_TYPE = 0x0202
+RES_TABLE_LIBRARY_TYPE = 0x0203
+
+# Flags in the STRING Section
+SORTED_FLAG = 1 << 0
+UTF8_FLAG = 1 << 8
+
 # Position of the fields inside an attribute
 ATTRIBUTE_IX_NAMESPACE_URI = 0
 ATTRIBUTE_IX_NAME = 1
@@ -6,44 +83,14 @@ ATTRIBUTE_IX_VALUE_TYPE = 3
 ATTRIBUTE_IX_VALUE_DATA = 4
 ATTRIBUTE_LENGHT = 5
 
-# Chunk Headers
-CHUNK_AXML_FILE = 0x00080003
-CHUNK_STRING = 0x001C0001
-CHUNK_RESOURCEIDS = 0x00080180
-CHUNK_XML_FIRST = 0x00100100
-CHUNK_XML_START_NAMESPACE = 0x00100100
-CHUNK_XML_END_NAMESPACE = 0x00100101
-CHUNK_XML_START_TAG = 0x00100102
-CHUNK_XML_END_TAG = 0x00100103
-CHUNK_XML_TEXT = 0x00100104
-CHUNK_XML_LAST = 0x00100104
-
+# Internally used state variables for AXMLParser
 START_DOCUMENT = 0
 END_DOCUMENT = 1
 START_TAG = 2
 END_TAG = 3
 TEXT = 4
 
-# FIXME there are duplicates and missing values...
-TYPE_NULL = 0
-TYPE_REFERENCE = 1
-TYPE_ATTRIBUTE = 2
-TYPE_STRING = 3
-TYPE_FLOAT = 4
-TYPE_DIMENSION = 5
-TYPE_FRACTION = 6
-TYPE_FIRST_INT = 16
-TYPE_INT_DEC = 16
-TYPE_INT_HEX = 17
-TYPE_INT_BOOLEAN = 18
-TYPE_FIRST_COLOR_INT = 28
-TYPE_INT_COLOR_ARGB8 = 28
-TYPE_INT_COLOR_RGB8 = 29
-TYPE_INT_COLOR_ARGB4 = 30
-TYPE_INT_COLOR_RGB4 = 31
-TYPE_LAST_COLOR_INT = 31
-TYPE_LAST_INT = 31
-
+# Table used to lookup functions to determine the value representation in ARSCParser
 TYPE_TABLE = {
     TYPE_ATTRIBUTE: "attribute",
     TYPE_DIMENSION: "dimension",
@@ -65,32 +112,7 @@ RADIX_MULTS = [0.00390625, 3.051758E-005, 1.192093E-007, 4.656613E-010]
 DIMENSION_UNITS = ["px", "dip", "sp", "pt", "in", "mm"]
 FRACTION_UNITS = ["%", "%p"]
 
-COMPLEX_UNIT_MASK = 15
-
-# Constants for ARSC Files
-RES_NULL_TYPE = 0x0000
-RES_STRING_POOL_TYPE = 0x0001
-RES_TABLE_TYPE = 0x0002
-RES_XML_TYPE = 0x0003
-
-# Chunk types in RES_XML_TYPE
-RES_XML_FIRST_CHUNK_TYPE = 0x0100
-RES_XML_START_NAMESPACE_TYPE = 0x0100
-RES_XML_END_NAMESPACE_TYPE = 0x0101
-RES_XML_START_ELEMENT_TYPE = 0x0102
-RES_XML_END_ELEMENT_TYPE = 0x0103
-RES_XML_CDATA_TYPE = 0x0104
-RES_XML_LAST_CHUNK_TYPE = 0x017f
-
-# This contains a uint32_t array mapping strings in the string
-# pool back to resource identifiers.  It is optional.
-RES_XML_RESOURCE_MAP_TYPE = 0x0180
-
-# Chunk types in RES_TABLE_TYPE
-RES_TABLE_PACKAGE_TYPE = 0x0200
-RES_TABLE_TYPE_TYPE = 0x0201
-RES_TABLE_TYPE_SPEC_TYPE = 0x0202
-RES_TABLE_LIBRARY_TYPE = 0x0203
+COMPLEX_UNIT_MASK = 0x0F
 
 ACONFIGURATION_MCC = 0x0001
 ACONFIGURATION_MNC = 0x0002

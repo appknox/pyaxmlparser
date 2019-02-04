@@ -24,6 +24,9 @@ log = logging.getLogger("pyaxmlparser.arscutil")
 
 
 class ARSCResTablePackage(object):
+    """
+    See http://androidxref.com/9.0.0_r3/xref/frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h#861
+    """
     def __init__(self, buff, header):
         self.header = header
         self.start = buff.get_idx()
@@ -42,13 +45,70 @@ class ARSCResTablePackage(object):
 
 
 class ARSCHeader(object):
+    """
+    Object which contains a Resource Chunk.
+    This is an implementation of the `ResChunk_header`.
+
+    It will throw an AssertionError if the header could not be read successfully.
+
+    It is not checked if the data is outside the buffer size nor if the current
+    chunk fits into the parent chunk (if any)!
+
+    See http://androidxref.com/9.0.0_r3/xref/frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h#196
+    """
     SIZE = 2 + 2 + 4
 
     def __init__(self, buff):
         self.start = buff.get_idx()
-        self.type = unpack('<h', buff.read(2))[0]
-        self.header_size = unpack('<h', buff.read(2))[0]
-        self.size = unpack('<I', buff.read(4))[0]
+        # Make sure we do not read over the buffer:
+        assert buff.size() >= self.start + self.SIZE, "Can not read over the buffer size! Offset={}".format(self.start)
+        self._type, self._header_size, self._size = unpack('<HHL', buff.read(self.SIZE))
+
+        # Assert that the read data will fit into the chunk.
+        # The total size must be equal or larger than the header size
+        assert self._header_size >= self.SIZE, \
+            "declared header size is smaller than required size of {}! Offset={}".format(self.SIZE, self.start)
+        assert self._size >= self.SIZE, \
+            "declared chunk size is smaller than required size of {}! Offset={}".format(self.SIZE, self.start)
+        assert self._size >= self._header_size, \
+            "declared chunk size ({}) is smaller than header size ({})! Offset={}".format(self._size,
+                                                                                          self._header_size,
+                                                                                          self.start)
+
+    @property
+    def type(self):
+        """
+        Type identifier for this chunk
+        """
+        return self._type
+
+    @property
+    def header_size(self):
+        """
+        Size of the chunk header (in bytes).  Adding this value to
+        the address of the chunk allows you to find its associated data
+        (if any).
+        """
+        return self._header_size
+
+    @property
+    def size(self):
+        """
+        Total size of this chunk (in bytes).  This is the chunkSize plus
+        the size of any data associated with the chunk.  Adding this value
+        to the chunk allows you to completely skip its contents (including
+        any child chunks).  If this value is the same as chunkSize, there is
+        no data associated with the chunk.
+        """
+        return self._size
+
+    @property
+    def end(self):
+        """
+        Get the absolute offset inside the file, where the chunk ends.
+        This is equal to `ARSCHeader.start + ARSCHeader.size`.
+        """
+        return self.start + self.size
 
     def __repr__(self):
         return (
@@ -57,12 +117,17 @@ class ARSCHeader(object):
 
 
 class ARSCResTypeSpec(object):
+    """
+    See http://androidxref.com/9.0.0_r3/xref/frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h#1327
+    """
     def __init__(self, buff, parent=None):
         self.start = buff.get_idx()
         self.parent = parent
-        self.id = unpack('<b', buff.read(1))[0]
-        self.res0 = unpack('<b', buff.read(1))[0]
-        self.res1 = unpack('<h', buff.read(2))[0]
+        self.id = unpack('<B', buff.read(1))[0]
+        self.res0 = unpack('<B', buff.read(1))[0]
+        self.res1 = unpack('<H', buff.read(2))[0]
+        assert self.res0 == 0, "res0 must be zero!"
+        assert self.res1 == 0, "res1 must be zero!"
         self.entryCount = unpack('<I', buff.read(4))[0]
 
         self.typespec_entries = []
@@ -71,14 +136,20 @@ class ARSCResTypeSpec(object):
 
 
 class ARSCResType(object):
+    """
+    See http://androidxref.com/9.0.0_r3/xref/frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h#1364
+    """
     def __init__(self, buff, parent=None):
         self.start = buff.get_idx()
         self.parent = parent
-        self.id = unpack('<b', buff.read(1))[0]
-        self.res0 = unpack('<b', buff.read(1))[0]
-        self.res1 = unpack('<h', buff.read(2))[0]
-        self.entryCount = unpack('<i', buff.read(4))[0]
-        self.entriesStart = unpack('<i', buff.read(4))[0]
+
+        self.id = unpack('<B', buff.read(1))[0]
+        self.flags, = unpack('<B', buff.read(1))
+        self.reserved = unpack('<H', buff.read(2))[0]
+        assert self.reserved == 0, "reserved must be zero!"
+        self.entryCount = unpack('<I', buff.read(4))[0]
+        self.entriesStart = unpack('<I', buff.read(4))[0]
+
         self.mResId = (0xff000000 & self.parent.get_mResId()) | self.id << 16
         self.parent.set_mResId(self.mResId)
 
@@ -94,8 +165,8 @@ class ARSCResType(object):
         return "ARSCResType(%x, %x, %x, %x, %x, %x, %x, %s)" % (
             self.start,
             self.id,
-            self.res0,
-            self.res1,
+            self.flags,
+            self.reserved,
             self.entryCount,
             self.entriesStart,
             self.mResId,
@@ -104,6 +175,14 @@ class ARSCResType(object):
 
 
 class ARSCResTableConfig(object):
+    """
+    ARSCResTableConfig contains the configuration for specific resource selection.
+    This is used on the device to determine which resources should be loaded
+    based on different properties of the device like locale or displaysize.
+
+    See the definition of ResTable_config in
+    http://androidxref.com/9.0.0_r3/xref/frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h#911
+    """
     @classmethod
     def default_config(cls):
         if not hasattr(cls, 'DEFAULT'):
@@ -111,16 +190,6 @@ class ARSCResTableConfig(object):
         return cls.DEFAULT
 
     def __init__(self, buff=None, **kwargs):
-        """
-        ARSCResTableConfig contains the configuration for specific resource
-        selection.
-        This is used on the device to determine which resources should be loaded
-        based on different properties of the device like locale or displaysize.
-        See the definiton of ResTable_config in
-    platform_frameworks_base/libs/androidfw/include/androidfw/ResourceTypes.h
-        :param buff:
-        :param kwargs:
-        """
         if buff is not None:
             self.start = buff.get_idx()
 
@@ -156,34 +225,43 @@ class ARSCResTableConfig(object):
 
             # struct of
             # uint16_t sdkVersion
-            # uint16_t minorVersion  which should be always 0, as the meaning
-            # is not defined
+            # uint16_t minorVersion  which should be always 0, as the meaning is not defined
             self.version = unpack('<I', buff.read(4))[0]
 
-            self.screenConfig = 0
-            self.screenSizeDp = 0
-
+            # The next three fields seems to be optional
             if self.size >= 32:
-                # FIXME: is this really not always there?
                 # struct of
                 # uint8_t screenLayout
                 # uint8_t uiMode
                 # uint16_t smallestScreenWidthDp
-                self.screenConfig = unpack('<I', buff.read(4))[0]
+                self.screenConfig, = unpack('<I', buff.read(4))
+            else:
+                log.debug("This file does not have a screenConfig! size={}".format(self.size))
+                self.screenConfig = 0
 
-                if self.size >= 36:
-                    # FIXME is this really not always there?
-                    # struct of
-                    # uint16_t screenWidthDp
-                    # uint16_t screenHeightDp
-                    self.screenSizeDp = unpack('<I', buff.read(4))[0]
+            if self.size >= 36:
+                # struct of
+                # uint16_t screenWidthDp
+                # uint16_t screenHeightDp
+                self.screenSizeDp, = unpack('<I', buff.read(4))
+            else:
+                log.debug("This file does not have a screenSizeDp! size={}".format(self.size))
+                self.screenSizeDp = 0
 
-            self.exceedingSize = self.size - 36
+            if self.size >= 40:
+                # struct of
+                # uint8_t screenLayout2
+                # uint8_t colorMode
+                # uint16_t screenConfigPad2
+                self.screenConfig2, = unpack("<I", buff.read(4))
+            else:
+                log.debug("This file does not have a screenConfig2! size={}".format(self.size))
+                self.screenConfig2 = 0
+
+            self.exceedingSize = self.size - (buff.tell() - self.start)
             if self.exceedingSize > 0:
                 log.debug("Skipping padding bytes!")
                 self.padding = buff.read(self.exceedingSize)
-
-        # TODO there is screenConfig2
 
         else:
             self.start = 0
@@ -224,6 +302,9 @@ class ARSCResTableConfig(object):
                 ((kwargs.pop('screenWidthDp', 0) & 0xffff) << 0) + \
                 ((kwargs.pop('screenHeightDp', 0) & 0xffff) << 16)
 
+            # TODO add this some day...
+            self.screenConfig2 = 0
+
             self.exceedingSize = 0
 
     def _unpack_language_or_region(self, char_in, char_base):
@@ -243,6 +324,10 @@ class ARSCResTableConfig(object):
         return char_out
 
     def get_language_and_region(self):
+        """
+        Returns the combined language+region string or \x00\x00 for the default locale
+        :return:
+        """
         if self.locale != 0:
             _language = self._unpack_language_or_region(
                 [self.locale & 0xff, (self.locale & 0xff00) >> 8, ], ord('a'))
@@ -250,13 +335,32 @@ class ARSCResTableConfig(object):
                 [
                     (self.locale & 0xff0000) >> 16,
                     (self.locale & 0xff000000) >> 24,
-                ],
-                ord('0')
+                ], ord('0')
             )
             return (_language + "-r" + _region) if _region else _language
-        return ""
+        return "\x00\x00"
 
     def get_config_name_friendly(self):
+        """
+        Here for legacy reasons.
+
+        use :meth:`~get_qualifier` instead.
+        """
+        return self.get_qualifier()
+
+    def get_qualifier(self):
+        """
+        Return resource name qualifier for the current configuration.
+        for example
+        * `ldpi-v4`
+        * `hdpi-v4`
+
+        All possible qualifiers are listed in table 2 of https://developer.android.com/guide
+        /topics/resources/providing-resources
+
+        FIXME: This name might not have all properties set!
+        :return: str
+        """
         res = []
 
         mcc = self.imsi & 0xFFFF
@@ -276,8 +380,7 @@ class ARSCResTableConfig(object):
             elif screenLayout & const.MASK_LAYOUTDIR == const.LAYOUTDIR_RTL:
                 res.append("ldrtl")
             else:
-                res.append(
-                    "layoutDir_%d" % (screenLayout & const.MASK_LAYOUTDIR))
+                res.append("layoutDir_%d" % (screenLayout & const.MASK_LAYOUTDIR))
 
         smallestScreenWidthDp = (self.screenConfig & 0xFFFF0000) >> 16
         if smallestScreenWidthDp != 0:
@@ -293,32 +396,21 @@ class ARSCResTableConfig(object):
         if (screenLayout & const.MASK_SCREENSIZE) != const.SCREENSIZE_ANY:
             if screenLayout & const.MASK_SCREENSIZE == const.SCREENSIZE_SMALL:
                 res.append("small")
-            elif screenLayout & \
-                    const.MASK_SCREENSIZE == const.SCREENSIZE_NORMAL:
+            elif screenLayout & const.MASK_SCREENSIZE == const.SCREENSIZE_NORMAL:
                 res.append("normal")
-            elif screenLayout & \
-                    const.MASK_SCREENSIZE == const.SCREENSIZE_LARGE:
+            elif screenLayout & const.MASK_SCREENSIZE == const.SCREENSIZE_LARGE:
                 res.append("large")
-            elif screenLayout & \
-                    const.MASK_SCREENSIZE == const.SCREENSIZE_XLARGE:
+            elif screenLayout & const.MASK_SCREENSIZE == const.SCREENSIZE_XLARGE:
                 res.append("xlarge")
             else:
-                res.append(
-                    "screenLayoutSize_%d" % (
-                        screenLayout & const.MASK_SCREENSIZE
-                    )
-                )
+                res.append("screenLayoutSize_%d" % (screenLayout & const.MASK_SCREENSIZE))
         if (screenLayout & const.MASK_SCREENLONG) != 0:
             if screenLayout & const.MASK_SCREENLONG == const.SCREENLONG_NO:
                 res.append("notlong")
             elif screenLayout & const.MASK_SCREENLONG == const.SCREENLONG_YES:
                 res.append("long")
             else:
-                res.append(
-                    "screenLayoutLong_%d" % (
-                        screenLayout & const.MASK_SCREENLONG
-                    )
-                )
+                res.append("screenLayoutLong_%d" % (screenLayout & const.MASK_SCREENLONG))
 
         density = (self.screenType & 0xffff0000) >> 16
         if density != const.DENSITY_DEFAULT:
@@ -382,6 +474,15 @@ class ARSCResTableConfig(object):
         x = ((self.screenType >> 16) & 0xffff)
         return x
 
+    def is_default(self):
+        """
+        Test if this is a default resource, which matches all
+
+        This is indicated that all fields are zero.
+        :return: True if default, False otherwise
+        """
+        return all(map(lambda x: x == 0, self._get_tuple()))
+
     def _get_tuple(self):
         return (
             self.imsi,
@@ -392,6 +493,7 @@ class ARSCResTableConfig(object):
             self.version,
             self.screenConfig,
             self.screenSizeDp,
+            self.screenConfig2,
         )
 
     def __hash__(self):
@@ -401,10 +503,14 @@ class ARSCResTableConfig(object):
         return self._get_tuple() == other._get_tuple()
 
     def __repr__(self):
-        return "<ARSCResTableConfig '{}'>".format(repr(self._get_tuple()))
+        return "<ARSCResTableConfig '{}'='{}'>".format(self.get_qualifier(), repr(self._get_tuple()))
 
 
 class ARSCResTableEntry(object):
+    """
+    See https://github.com/LineageOS/android_frameworks_base/blob/
+    df2898d9ce306bb2fe922d3beaa34a9cf6873d27/include/androidfw/ResourceTypes.h#L1370
+    """
     FLAG_COMPLEX = 1
     FLAG_PUBLIC = 2
     FLAG_WEAK = 4
@@ -433,7 +539,7 @@ class ARSCResTableEntry(object):
         return self.key.get_data_value()
 
     def is_public(self):
-        return (self.flags & self.FLAG.PUBLIC) != 0
+        return (self.flags & self.FLAG_PUBLIC) != 0
 
     def is_complex(self):
         return (self.flags & self.FLAG_COMPLEX) != 0
@@ -468,8 +574,7 @@ class ARSCComplex(object):
                                ARSCResStringPoolRef(buff, self.parent)))
 
     def __repr__(self):
-        return "<ARSCComplex idx='0x{:08x}' parent='{}' count='{}'>".format(
-            self.start, self.id_parent, self.count)
+        return "<ARSCComplex idx='0x{:08x}' parent='{}' count='{}'>".format(self.start, self.id_parent, self.count)
 
 
 class ARSCResStringPoolRef(object):
@@ -506,21 +611,17 @@ class ARSCResStringPoolRef(object):
         return self.data_type == const.TYPE_REFERENCE
 
     def __repr__(self):
-        return (
-            "<ARSCResStringPoolRef idx='0x{:08x}' size='{}' "
-            "type='{}' data='0x{:08x}'>"
-        ).format(
+        return "<ARSCResStringPoolRef idx='0x{:08x}' size='{}' type='{}' data='0x{:08x}'>".format(
             self.start,
             self.size,
             const.TYPE_TABLE.get(self.data_type, "0x%x" % self.data_type),
             self.data)
-        return self.data_type
 
 
 def get_arsc_info(arscobj):
     """
-    Return a string containing all resources packages ordered by packagename,
-    locale and type.
+    Return a string containing all resources packages ordered by packagename, locale and type.
+
     :param arscobj: :class:`~ARSCParser`
     :return: a string
     """

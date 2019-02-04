@@ -39,7 +39,8 @@ class ARSCParser(object):
         self.buff = bytecode.BuffHandle(raw_buff)
 
         self.header = ARSCHeader(self.buff)
-        self.packageCount = unpack('<i', self.buff.read(4))[0]
+        # TODO: assert header type
+        self.packageCount = unpack('<I', self.buff.read(4))[0]
 
         self.packages = {}
         self.values = {}
@@ -49,9 +50,10 @@ class ARSCParser(object):
             lambda: collections.defaultdict(collections.defaultdict))
         self.stringpool_main = None
 
-        # skip to the start of the first chunk
+        # skip to the start of the first chunk data, skipping trailing header bytes
         self.buff.set_idx(self.header.start + self.header.header_size)
 
+        # Gives the offset inside the file of the end of this chunk
         data_end = self.header.start + self.header.size
 
         while self.buff.get_idx() <= data_end - ARSCHeader.SIZE:
@@ -147,7 +149,7 @@ class ARSCParser(object):
                     elif pkg_chunk_header.type == const.RES_TABLE_LIBRARY_TYPE:
                         log.warning("RES_TABLE_LIBRARY_TYPE chunk is not supported")
                     else:
-                        # silently skip other chunk types
+                        # FIXME: silently skip other chunk types
                         pass
 
                     # skip to the next chunk
@@ -172,15 +174,9 @@ class ARSCParser(object):
                     if header.type == const.RES_TABLE_TYPE_TYPE:
                         a_res_type = self.packages[package_name][nb + 1]
 
-                        language = a_res_type.config.get_language()
-                        region = a_res_type.config.get_country()
-                        if region == "\x00\x00":
-                            locale = language
-                        else:
-                            locale = "{}-r{}".format(language, region)
+                        locale = a_res_type.config.get_language_and_region()
 
-                        c_value = self.values[package_name].setdefault(
-                            locale, {"public": []})
+                        c_value = self.values[package_name].setdefault(locale, {"public": []})
 
                         entries = self.packages[package_name][nb + 2]
                         nb_i = 0
@@ -189,13 +185,7 @@ class ARSCParser(object):
                                 ate = self.packages[package_name][nb + 3 + nb_i]
 
                                 self.resource_values[ate.mResId][a_res_type.config] = ate
-                                self.resource_keys[
-                                    package_name
-                                ][
-                                    a_res_type.get_type()
-                                ][
-                                    ate.get_value()
-                                ] = ate.mResId
+                                self.resource_keys[package_name][a_res_type.get_type()][ate.get_value()] = ate.mResId
 
                                 if ate.get_index() != -1:
                                     c_value["public"].append(
@@ -276,7 +266,7 @@ class ARSCParser(object):
                     const.DIMENSION_UNITS[ate.key.get_data() & const.COMPLEX_UNIT_MASK])
             ]
         except IndexError:
-            log.warning("Out of range dimension unit index for %s: %s" % (
+            log.debug("Out of range dimension unit index for %s: %s" % (
                 complexToFloat(ate.key.get_data()),
                 ate.key.get_data() & const.COMPLEX_UNIT_MASK))
             return [ate.get_value(), ate.key.get_data()]
@@ -295,6 +285,7 @@ class ARSCParser(object):
     def get_locales(self, package_name):
         """
         Retrieve a list of all available locales in a given packagename.
+
         :param package_name: the package name to get locales of
         """
         self._analyse()
@@ -304,6 +295,7 @@ class ARSCParser(object):
         """
         Retrieve a list of all types which are available in the given
         package and locale.
+
         :param package_name: the package name to get types of
         :param locale: the locale to get types of (default: '\x00\x00')
         """
@@ -313,7 +305,9 @@ class ARSCParser(object):
     def get_public_resources(self, package_name, locale='\x00\x00'):
         """
         Get the XML (as string) of all resources of type 'public'.
+
         The public resources table contains the IDs for each item.
+
         :param package_name: the package name to get the resources for
         :param locale: the locale to get the resources for (default: '\x00\x00')
         """
@@ -337,8 +331,10 @@ class ARSCParser(object):
     def get_string_resources(self, package_name, locale='\x00\x00'):
         """
         Get the XML (as string) of all resources of type 'string'.
+
         Read more about string resources:
         https://developer.android.com/guide/topics/resources/string-resource.html
+
         :param package_name: the package name to get the resources for
         :param locale: the locale to get the resources for (default: '\x00\x00')
         """
@@ -397,8 +393,10 @@ class ARSCParser(object):
     def get_id_resources(self, package_name, locale='\x00\x00'):
         """
         Get the XML (as string) of all resources of type 'id'.
+
         Read more about ID resources:
         https://developer.android.com/guide/topics/resources/more-resources.html#Id
+
         :param package_name: the package name to get the resources for
         :param locale: the locale to get the resources for (default: '\x00\x00')
         """
@@ -424,8 +422,10 @@ class ARSCParser(object):
     def get_bool_resources(self, package_name, locale='\x00\x00'):
         """
         Get the XML (as string) of all resources of type 'bool'.
+
         Read more about bool resources:
         https://developer.android.com/guide/topics/resources/more-resources.html#Bool
+
         :param package_name: the package name to get the resources for
         :param locale: the locale to get the resources for (default: '\x00\x00')
         """
@@ -447,8 +447,10 @@ class ARSCParser(object):
     def get_integer_resources(self, package_name, locale='\x00\x00'):
         """
         Get the XML (as string) of all resources of type 'integer'.
+
         Read more about integer resources:
         https://developer.android.com/guide/topics/resources/more-resources.html#Integer
+
         :param package_name: the package name to get the resources for
         :param locale: the locale to get the resources for (default: '\x00\x00')
         """
@@ -470,8 +472,10 @@ class ARSCParser(object):
     def get_color_resources(self, package_name, locale='\x00\x00'):
         """
         Get the XML (as string) of all resources of type 'color'.
+
         Read more about color resources:
         https://developer.android.com/guide/topics/resources/more-resources.html#Color
+
         :param package_name: the package name to get the resources for
         :param locale: the locale to get the resources for (default: '\x00\x00')
         """
@@ -493,8 +497,10 @@ class ARSCParser(object):
     def get_dimen_resources(self, package_name, locale='\x00\x00'):
         """
         Get the XML (as string) of all resources of type 'dimen'.
+
         Read more about Dimension resources:
         https://developer.android.com/guide/topics/resources/more-resources.html#Dimension
+
         :param package_name: the package name to get the resources for
         :param locale: the locale to get the resources for (default: '\x00\x00')
         """
@@ -514,6 +520,15 @@ class ARSCParser(object):
         return buff.encode('utf-8')
 
     def get_id(self, package_name, rid, locale='\x00\x00'):
+        """
+        Returns the tuple (resource_type, resource_name, resource_id)
+        for the given resource_id.
+
+        :param package_name: package name to query
+        :param rid: the resource_id
+        :param locale: specific locale
+        :return: tuple of (resource_type, resource_name, resource_id)
+        """
         self._analyse()
 
         try:
@@ -521,9 +536,13 @@ class ARSCParser(object):
                 if i[2] == rid:
                     return i
         except KeyError:
-            return None
+            pass
+        return None, None, None
 
     class ResourceResolver(object):
+        """
+        Resolves resources by ID
+        """
         def __init__(self, android_resources, config=None):
             self.resources = android_resources
             self.wanted_config = config
@@ -603,26 +622,23 @@ class ARSCParser(object):
 
     def get_res_configs(self, rid, config=None, fallback=True):
         """
-Return the resources found with the ID `rid` and select
-the right one based on the configuration, or return all if no
-configuration was set. But we try to be generous here and at least try to
-resolve something:
-This method uses a fallback to return at least one resource
-(the first one in the list)
-if more than one items are found and the default config is used and no
-default entry could be found.
-This is usually a bad sign (i.e. the developer did not follow the
-android documentation:
-https://developer.android.com/guide/topics/resources/localization.html#failing2)
-In practise an app might just be designed to run on a single
-locale and thus only has those locales set.
-You can disable this fallback behaviour, to just return exactly the
-given result.
-:param rid: resource id as int
-:param config: a config to resolve from, or None to get all results
-:param fallback: Enable the fallback for resolving default configuration
-                 (default: True)
-:return: a list of ARSCResTableConfig: ARSCResTableEntry
+        Return the resources found with the ID `rid` and select
+        the right one based on the configuration, or return all if no configuration was set.
+
+        But we try to be generous here and at least try to resolve something:
+        This method uses a fallback to return at least one resource (the first one in the list)
+        if more than one items are found and the default config is used and no default entry could be found.
+
+        This is usually a bad sign (i.e. the developer did not follow the android documentation:
+        https://developer.android.com/guide/topics/resources/localization.html#failing2)
+        In practise an app might just be designed to run on a single locale and thus only has those locales set.
+
+        You can disable this fallback behaviour, to just return exactly the given result.
+
+        :param rid: resource id as int
+        :param config: a config to resolve from, or None to get all results
+        :param fallback: Enable the fallback for resolving default configuration (default: True)
+        :return: a list of ARSCResTableConfig: ARSCResTableEntry
         """
         self._analyse()
 
@@ -632,7 +648,7 @@ given result.
             raise ValueError("'rid' must be an int")
 
         if rid not in self.resource_values:
-            log.warning("The requested rid could not be found in the resources.")
+            log.info("The requested rid could not be found in the resources.")
             return []
 
         res_options = self.resource_values[rid]
@@ -678,6 +694,76 @@ given result.
                 result[res_type.get_type()].extend(configs)
 
         return result
+
+    @staticmethod
+    def parse_id(name):
+        """
+        Resolves an id from a binary XML file in the form "@[package:]DEADBEEF"
+        and returns a tuple of package name and resource id.
+        If no package name was given, i.e. the ID has the form "@DEADBEEF",
+        the package name is set to None.
+
+        Raises a ValueError if the id is malformed.
+
+        :param name: the string of the resource, as in the binary XML file
+        :return: a tuple of (resource_id, package_name).
+        """
+
+        if not name.startswith('@'):
+            raise ValueError("Not a valid resource ID, must start with @: '{}'".format(name))
+
+        # remove @
+        name = name[1:]
+
+        package = None
+        if ':' in name:
+            package, res_id = name.split(':', 1)
+        else:
+            res_id = name
+
+        if len(res_id) != 8:
+            raise ValueError("Numerical ID is not 8 characters long: '{}'".format(res_id))
+
+        try:
+            return int(res_id, 16), package
+        except ValueError:
+            raise ValueError("ID is not a hex ID: '{}'".format(res_id))
+
+    def get_resource_xml_name(self, r_id, package=None):
+        """
+        Returns the XML name for a resource, including the package name if package is None.
+        A full name might look like `@com.example:string/foobar`
+        Otherwise the name is only looked up in the specified package and is returned without
+        the package name.
+        The same example from about without the package name will read as `@string/foobar`.
+
+        If the ID could not be found, `None` is returned.
+
+        A description of the XML name can be found here:
+        https://developer.android.com/guide/topics/resources/providing-resources#ResourcesFromXml
+
+        :param r_id: numerical ID if the resource
+        :param package: package name
+        :return: XML name identifier
+        """
+        if package:
+            resource, name, i_id = self.get_id(package, r_id)
+            if not i_id:
+                return None
+            return "@{}/{}".format(resource, name)
+        else:
+            for p in self.get_packages_names():
+                r, n, i_id = self.get_id(p, r_id)
+                if i_id:
+                    # found the resource in this package
+                    package = p
+                    resource = r
+                    name = n
+                    break
+            if not package:
+                return None
+            else:
+                return "@{}:{}/{}".format(package, resource, name)
 
 
 class PackageContext(object):
