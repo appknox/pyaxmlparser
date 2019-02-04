@@ -1924,12 +1924,12 @@ resources = {
 }
 
 SYSTEM_RESOURCES = {
-    'attributes': {
-        'forward': {k: v for k, v in resources['attr'].items()},
-        'inverse': {v: k for k, v in resources['attr'].items()}
+    "attributes": {
+        "forward": {k: v for k, v in resources['attr'].items()},
+        "inverse": {v: k for k, v in resources['attr'].items()}
     },
-    'styles': {
-        'forward': {k: v for k, v in resources['style'].items()},
-        'inverse': {v: k for k, v in resources['style'].items()}
+    "styles": {
+        "forward": {k: v for k, v in resources['style'].items()},
+        "inverse": {v: k for k, v in resources['style'].items()}
     }
 }

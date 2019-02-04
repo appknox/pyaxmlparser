@@ -15,12 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import unicode_literals
 import logging
 from struct import unpack
-import unicodedata
 
-from pyaxmlparser.utils import is_python_3
+
+log = logging.getLogger("pyaxmlparser.stringblock")
+
 
 # Flags in the STRING Section
 SORTED_FLAG = 1 << 0
@@ -31,148 +31,145 @@ class StringBlock(object):
     """
     StringBlock is a CHUNK inside an AXML File
     It contains all strings, which are used by referecing to ID's
-    TODO might migrate this block into the ARSCParser, as it it not a 'special' block but a normal tag.
+    TODO might migrate this block into the ARSCParser, as it it not a "special" block but a normal tag.
     """
-    def __init__(self, buff, header, debug=False):
-        self.log = logging.getLogger('pyaxmlparser.stringblock')
-        self.log.setLevel(logging.DEBUG if debug else logging.CRITICAL)
+    def __init__(self, buff, header):
         self._cache = {}
         self.header = header
         # We already read the header (which was chunk_type and chunk_size
         # Now, we read the string_count:
-        self.string_count = unpack('<i', buff.read(4))[0]
+        self.stringCount = unpack('<i', buff.read(4))[0]
         # style_count
-        self.style_offset_count = unpack('<i', buff.read(4))[0]
+        self.styleOffsetCount = unpack('<i', buff.read(4))[0]
 
         # flags
         self.flags = unpack('<i', buff.read(4))[0]
-        self.is_utf8 = ((self.flags & UTF8_FLAG) != 0)
+        self.m_isUTF8 = ((self.flags & UTF8_FLAG) != 0)
 
         # string_pool_offset
         # The string offset is counted from the beginning of the string section
-        self.strings_offset = unpack('<i', buff.read(4))[0]
+        self.stringsOffset = unpack('<i', buff.read(4))[0]
         # style_pool_offset
         # The styles offset is counted as well from the beginning of the string section
-        self.styles_offset = unpack('<i', buff.read(4))[0]
+        self.stylesOffset = unpack('<i', buff.read(4))[0]
 
-        # Check if they supplied a styles_offset even if the count is 0:
-        if self.style_offset_count == 0 and self.styles_offset > 0:
-            self.log.warning('Styles Offset given, but styleCount is zero.')
+        # Check if they supplied a stylesOffset even if the count is 0:
+        if self.styleOffsetCount == 0 and self.stylesOffset > 0:
+            log.warning("Styles Offset given, but styleCount is zero.")
 
-        self.string_offsets = []
-        self.style_offsets = []
-        self.char_buffer = b'' if is_python_3 else bytearray(b'')
-        self.styles = []
+        self.m_stringOffsets = []
+        self.m_styleOffsets = []
+        self.m_charbuff = ""
+        self.m_styles = []
 
         # Next, there is a list of string following
         # This is only a list of offsets (4 byte each)
-        for i in range(0, self.string_count):
-            self.string_offsets.append(unpack('<i', buff.read(4))[0])
+        for i in range(0, self.stringCount):
+            self.m_stringOffsets.append(unpack('<i', buff.read(4))[0])
 
         # And a list of styles
         # again, a list of offsets
-        for i in range(0, self.style_offset_count):
-            self.style_offsets.append(unpack('<i', buff.read(4))[0])
+        for i in range(0, self.styleOffsetCount):
+            self.m_styleOffsets.append(unpack('<i', buff.read(4))[0])
 
         # FIXME it is probably better to parse n strings and not the size
-        size = self.header.size - self.strings_offset
+        size = self.header.size - self.stringsOffset
 
         # if there are styles as well, we do not want to read them too.
         # Only read them, if no
-        if self.styles_offset != 0 and self.style_offset_count != 0:
-            size = self.styles_offset - self.strings_offset
+        if self.stylesOffset != 0 and self.styleOffsetCount != 0:
+            size = self.stylesOffset - self.stringsOffset
 
         # FIXME unaligned
         if (size % 4) != 0:
-            self.log.warning('Size of strings is not aligned by four bytes.')
+            log.warning("Size of strings is not aligned by four bytes.")
 
-        self.char_buffer = buff.read(size) if is_python_3 else bytearray(buff.read(size))
+        self.m_charbuff = buff.read(size)
 
-        if self.styles_offset != 0 and self.style_offset_count != 0:
-            size = self.header.size - self.styles_offset
+        if self.stylesOffset != 0 and self.styleOffsetCount != 0:
+            size = self.header.size - self.stylesOffset
 
             # FIXME unaligned
             if (size % 4) != 0:
-                self.log.warning('Size of styles is not aligned by four bytes.')
+                log.warning("Size of styles is not aligned by four bytes.")
 
             for i in range(0, size // 4):
-                self.styles.append(unpack('<i', buff.read(4))[0])
+                self.m_styles.append(unpack('<i', buff.read(4))[0])
 
-    def get_string(self, idx):
+    def getString(self, idx):
         if idx in self._cache:
             return self._cache[idx]
 
-        if idx < 0 or not self.string_offsets or idx >= len(
-                self.string_offsets):
-            return ''
+        if idx < 0 or not self.m_stringOffsets or idx >= len(
+                self.m_stringOffsets):
+            return ""
 
-        offset = self.string_offsets[idx]
-        if self.is_utf8:
-            value = self.decode_utf8(offset)
+        offset = self.m_stringOffsets[idx]
+
+        if self.m_isUTF8:
+            self._cache[idx] = self.decode8(offset)
         else:
-            value = self.decode_utf16(offset)
+            self._cache[idx] = self.decode16(offset)
 
-        # Remove all control symbol https://www.compart.com/en/unicode/category/Cc
-        # fix function _escape from axmlprinter
-        self._cache[idx] = ''.join(c if unicodedata.category(c) != 'Cc' else '' for c in value)
         return self._cache[idx]
 
-    def get_style(self, idx):
+    def getStyle(self, idx):
         # FIXME
-        return self.styles[idx]
+        return self.m_styles[idx]
 
-    def decode_utf8(self, offset):
-        str_len, skip = self.decode_length(offset, 1)
+    def decode8(self, offset):
+        str_len, skip = self.decodeLength(offset, 1)
         offset += skip
 
-        encoded_bytes, skip = self.decode_length(offset, 1)
+        encoded_bytes, skip = self.decodeLength(offset, 1)
         offset += skip
 
-        data = self.char_buffer[offset: offset + encoded_bytes]
+        data = self.m_charbuff[offset: offset + encoded_bytes]
 
         return self.decode_bytes(data, 'utf-8', str_len)
 
-    def decode_utf16(self, offset):
-        str_len, skip = self.decode_length(offset, 2)
+    def decode16(self, offset):
+        str_len, skip = self.decodeLength(offset, 2)
         offset += skip
 
         encoded_bytes = str_len * 2
 
-        data = self.char_buffer[offset: offset + encoded_bytes]
+        data = self.m_charbuff[offset: offset + encoded_bytes]
 
         return self.decode_bytes(data, 'utf-16', str_len)
 
     def decode_bytes(self, data, encoding, str_len):
         string = data.decode(encoding, 'replace')
         if len(string) != str_len:
-            self.log.warning('invalid decoded string length')
+            log.warning("invalid decoded string length")
         return string
 
-    def decode_length(self, offset, sizeof_char):
-        length = self.char_buffer[offset]
+    def decodeLength(self, offset, sizeof_char):
+        length = self.m_charbuff[offset]
 
         sizeof_2chars = sizeof_char << 1
-        fmt = '<2B' if sizeof_char == 1 else '<2H'
+        fmt_chr = 'B' if sizeof_char == 1 else 'H'
+        fmt = "<2" + fmt_chr
 
         length1, length2 = unpack(
-            fmt, self.char_buffer[offset:(offset + sizeof_2chars)])
+            fmt, self.m_charbuff[offset:(offset + sizeof_2chars)])
 
-        high_bit = 0x80 << (8 * (sizeof_char - 1))
+        highbit = 0x80 << (8 * (sizeof_char - 1))
 
-        if (length & high_bit) != 0:
+        if (length & highbit) != 0:
             return (
-                (length1 & ~high_bit) << (8 * sizeof_char)
+                (length1 & ~highbit) << (8 * sizeof_char)
             ) | length2, sizeof_2chars
         else:
             return length1, sizeof_char
 
     def show(self):
-        print('StringBlock(%x, %x, %x, %x, %x, %x' % (
+        print("StringBlock(%x, %x, %x, %x, %x, %x" % (
             self.start,
             self.header,
             self.header_size,
-            self.chunk_size,
-            self.strings_offset,
+            self.chunkSize,
+            self.stringsOffset,
             self.flags))
-        for i in range(0, len(self.string_offsets)):
-            print(i, repr(self.get_string(i)))
+        for i in range(0, len(self.m_stringOffsets)):
+            print(i, repr(self.getString(i)))

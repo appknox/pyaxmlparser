@@ -15,91 +15,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import unicode_literals
-import os
 import logging
 from struct import unpack
 from collections import defaultdict
-from zipfile import ZipFile, is_zipfile
 
 import pyaxmlparser.constants as const
 from pyaxmlparser import bytecode
 from pyaxmlparser.stringblock import StringBlock
 from pyaxmlparser import public
 from . import arscutil
-from pyaxmlparser.utils import string_types, text_type
+
+log = logging.getLogger("pyaxmlparser.axmlparser")
 
 
 class AXMLParser(object):
-    def __init__(self, raw_buff=None, debug=False):
-        self.log = logging.getLogger('pyaxmlparser.axmlparser')
-        self.log.setLevel(logging.DEBUG if debug else logging.CRITICAL)
-        self.event = -1
-        self.line_number = -1
-        self.name = -1
-        self.namespace_uri = -1
-        self.attributes = []
-        self.id_attribute = -1
-        self.class_attribute = -1
-        self.style_attribute = -1
-        self.namespace = -1
-        data = b''
+    def __init__(self, raw_buff):
+        self.reset()
 
-        if hasattr(raw_buff, 'read'):
-            data = raw_buff.read()
-        else:
-            path_to_file = None
-            try:
-                if os.path.exists(raw_buff):
-                    path_to_file = raw_buff
-            except BaseException:
-                pass
-            if path_to_file:
-                if is_zipfile(path_to_file):
-                    with ZipFile(path_to_file, 'r') as apk:
-                        if 'AndroidManifest.xml' in apk.namelist():
-                            data = apk.read('AndroidManifest.xml')
-                else:
-                    with open(path_to_file, 'rb') as xml_file:
-                        data = xml_file.read()
-            else:
-                data = raw_buff
+        self.valid_axml = True
+        self.axml_tampered = False
+        self.packerwarning = False
+        self.buff = bytecode.BuffHandle(raw_buff)
 
-        if not isinstance(data, string_types):
-            raise ValueError('AXMLParser need file path to apk or xml, str or bytes data.')
-        if isinstance(data, text_type):
-            data = bytearray(data, encoding='utf-8')
-        else:
-            data = bytearray(data)
+        axml_file, = unpack('<L', self.buff.read(4))
 
-        self.valid_android_xml = True
-        self.android_xml_tampered = False
-        self.packer_warning = False
-        self.buff = bytecode.BuffHandle(data)
-        android_xml_file, = unpack('<L', self.buff.read(4))
-
-        if android_xml_file != const.CHUNK_ANDROID_XML_FILE:
+        if axml_file != const.CHUNK_AXML_FILE:
             # It looks like the header is wrong.
             # need some other checks.
             # We noted, that a some of files start with 0x0008NNNN,
             # where NNNN is some random number
 
-            if android_xml_file >> 16 == 0x0008:
-                self.android_xml_tampered = True
-                self.log.warning(
-                    'ANDROID XML file has an unusual header, most malware like '
-                    'doing such stuff to anti androguard! But we try to parse '
-                    'it anyways. Header: 0x{:08x}'.format(android_xml_file)
+            if axml_file >> 16 == 0x0008:
+                self.axml_tampered = True
+                log.warning(
+                    "AXML file has an unusual header, most malwares like "
+                    "doing such stuff to anti androguard! But we try to parse "
+                    "it anyways. Header: 0x{:08x}".format(axml_file)
                 )
             else:
-                self.valid_android_xml = False
-                self.log.warning('Not a valid ANDROID XML file. Header 0x{:08x}'.format(android_xml_file))
+                self.valid_axml = False
+                log.warning("Not a valid AXML file. Header 0x{:08x}".format(axml_file))
                 return
 
         # Next is the filesize
         self.filesize, = unpack('<L', self.buff.read(4))
         assert self.filesize <= self.buff.size(), (
-            'Declared filesize does not match real size: {} vs {}'.format(
+            "Declared filesize does not match real size: {} vs {}".format(
                 self.filesize, self.buff.size()
             )
         )
@@ -107,50 +68,47 @@ class AXMLParser(object):
         # Now we parse the STRING POOL
         header = arscutil.ARSCHeader(self.buff)  # read 8 byte=header+chunk_size
         assert header.type == const.RES_STRING_POOL_TYPE, (
-            'Expected String Pool header, got %x' % header.type
+            "Expected String Pool header, got %x" % header.type
         )
 
-        self.string_block = StringBlock(self.buff, header)
+        self.sb = StringBlock(self.buff, header)
 
-        self.resource_ids = []
-        self.prefix_uri = {}
-        self.uri_prefix = defaultdict(list)
+        self.m_resourceIDs = []
+        self.m_prefixuri = {}
+        self.m_uriprefix = defaultdict(list)
         # Contains a list of current prefix/uri pairs
-        self.prefix_uri_list = []
+        self.m_prefixuriL = []
         # Store which namespaces are already printed
         self.visited_ns = []
 
     def is_valid(self):
-        return self.valid_android_xml
+        return self.valid_axml
 
     def reset(self):
-        self.event = -1
-        self.line_number = -1
-        self.name = -1
-        self.namespace_uri = -1
-        self.attributes = []
-        self.id_attribute = -1
-        self.class_attribute = -1
-        self.style_attribute = -1
-        self.namespace = -1
-
-    def next(self):
-        return self.__next__()
+        self.m_event = -1
+        self.m_lineNumber = -1
+        self.m_name = -1
+        self.m_namespaceUri = -1
+        self.m_attributes = []
+        self.m_idAttribute = -1
+        self.m_classAttribute = -1
+        self.m_styleAttribute = -1
 
     def __next__(self):
-        self.do_next()
-        return self.event
+        self.doNext()
+        return self.m_event
 
-    def do_next(self):
-        if self.event == const.END_DOCUMENT:
+    def doNext(self):
+        if self.m_event == const.END_DOCUMENT:
             return
 
-        event = self.event
+        event = self.m_event
 
         self.reset()
         while True:
+            chunkType = -1
             # General notes:
-            # * chunk_size is from start of chunk, including the tag type
+            # * chunkSize is from start of chunk, including the tag type
 
             # Fake END_DOCUMENT event.
             if event == const.END_TAG:
@@ -158,37 +116,37 @@ class AXMLParser(object):
 
             # START_DOCUMENT
             if event == const.START_DOCUMENT:
-                chunk_type = const.CHUNK_XML_START_TAG
+                chunkType = const.CHUNK_XML_START_TAG
             else:
                 # Stop at the declared filesize or at the end of the file
                 if self.buff.end() or self.buff.get_idx() == self.filesize:
-                    self.event = const.END_DOCUMENT
+                    self.m_event = const.END_DOCUMENT
                     break
-                chunk_type = unpack('<L', self.buff.read(4))[0]
+                chunkType = unpack('<L', self.buff.read(4))[0]
 
             # Parse ResourceIDs. This chunk is after the String section
-            if chunk_type == const.CHUNK_RESOURCE_IDS:
-                chunk_size = unpack('<L', self.buff.read(4))[0]
+            if chunkType == const.CHUNK_RESOURCEIDS:
+                chunkSize = unpack('<L', self.buff.read(4))[0]
 
                 # Check size: < 8 bytes mean that the chunk is not complete
                 # Should be aligned to 4 bytes.
-                if chunk_size < 8 or chunk_size % 4 != 0:
-                    self.log.warning('Invalid chunk size in chunk RESOURCEIDS')
+                if chunkSize < 8 or chunkSize % 4 != 0:
+                    log.warning("Invalid chunk size in chunk RESOURCEIDS")
 
-                for i in range(0, (chunk_size // 4) - 2):
-                    self.resource_ids.append(
+                for i in range(0, (chunkSize // 4) - 2):
+                    self.m_resourceIDs.append(
                         unpack('<L', self.buff.read(4))[0])
 
                 continue
 
             # FIXME, unknown chunk types might cause problems
-            if chunk_type < const.CHUNK_XML_FIRST or \
-                    chunk_type > const.CHUNK_XML_LAST:
-                self.log.warning('invalid chunk type 0x{:08x}'.format(chunk_type))
+            if chunkType < const.CHUNK_XML_FIRST or \
+                    chunkType > const.CHUNK_XML_LAST:
+                log.warning("invalid chunk type 0x{:08x}".format(chunkType))
 
             # Fake START_DOCUMENT event.
-            if chunk_type == const.CHUNK_XML_START_TAG and event == -1:
-                self.event = const.START_DOCUMENT
+            if chunkType == const.CHUNK_XML_START_TAG and event == -1:
+                self.m_event = const.START_DOCUMENT
                 break
 
             # After the chunk_type, there are always 3 fields for the remaining
@@ -198,7 +156,7 @@ class AXMLParser(object):
             # are correct in size
             self.buff.read(4)
             # Line Number
-            self.line_number = unpack('<L', self.buff.read(4))[0]
+            self.m_lineNumber = unpack('<L', self.buff.read(4))[0]
             # Comment_Index (usually 0xFFFFFFFF, we do not need it)
             self.buff.read(4)
 
@@ -210,56 +168,56 @@ class AXMLParser(object):
             # * START_TAG
             # * END_TAG
             # * TEXT
-            if chunk_type == const.CHUNK_XML_START_NAMESPACE or \
-                    chunk_type == const.CHUNK_XML_END_NAMESPACE:
-                if chunk_type == const.CHUNK_XML_START_NAMESPACE:
+            if chunkType == const.CHUNK_XML_START_NAMESPACE or \
+                    chunkType == const.CHUNK_XML_END_NAMESPACE:
+                if chunkType == const.CHUNK_XML_START_NAMESPACE:
                     prefix = unpack('<L', self.buff.read(4))[0]
                     uri = unpack('<L', self.buff.read(4))[0]
 
                     # FIXME We will get a problem here, if the same uri is used
                     # with different prefixes!
                     # prefix --> uri is a 1:1 mapping
-                    self.prefix_uri[prefix] = uri
+                    self.m_prefixuri[prefix] = uri
                     # but uri --> prefix is a 1:n mapping!
-                    self.uri_prefix[uri].append(prefix)
-                    self.prefix_uri_list.append((prefix, uri))
-                    self.namespace = uri
+                    self.m_uriprefix[uri].append(prefix)
+                    self.m_prefixuriL.append((prefix, uri))
+                    self.ns = uri
 
                     # Workaround for closing tags
                     if (uri, prefix) in self.visited_ns:
                         self.visited_ns.remove((uri, prefix))
                 else:
-                    self.namespace = -1
+                    self.ns = -1
                     # END_PREFIX contains again prefix and uri field
                     prefix, = unpack('<L', self.buff.read(4))
                     uri, = unpack('<L', self.buff.read(4))
 
-                    # We can then remove those from the prefix_uri_list
-                    if (prefix, uri) in self.prefix_uri_list:
-                        self.prefix_uri_list.remove((prefix, uri))
+                    # We can then remove those from the prefixuriL
+                    if (prefix, uri) in self.m_prefixuriL:
+                        self.m_prefixuriL.remove((prefix, uri))
 
-                    # We also remove the entry from prefix_uri and uri_prefix:
-                    if prefix in self.prefix_uri:
-                        del self.prefix_uri[prefix]
-                    if uri in self.uri_prefix:
-                        self.uri_prefix[uri].remove(prefix)
-                    # Need to remove them from visited namespaces as well, as it might pop up later
+                    # We also remove the entry from prefixuri and uriprefix:
+                    if prefix in self.m_prefixuri:
+                        del self.m_prefixuri[prefix]
+                    if uri in self.m_uriprefix:
+                        self.m_uriprefix[uri].remove(prefix)
+                    # Need to remove them from visisted namespaces as well, as it might pop up later
                     # FIXME we need to remove it also if we leave a tag which closes it namespace
                     # Workaround for now: remove it on a START_NAMESPACE tag
                     if (uri, prefix) in self.visited_ns:
                         self.visited_ns.remove((uri, prefix))
 
                     else:
-                        self.log.warning(
-                            'Reached a NAMESPACE_END without having the '
-                            'namespace stored before? Prefix ID: {}, URI ID: '
-                            '{}'.format(prefix, uri)
+                        log.warning(
+                            "Reached a NAMESPACE_END without having the "
+                            "namespace stored before? Prefix ID: {}, URI ID: "
+                            "{}".format(prefix, uri)
                         )
 
                 continue
 
             # START_TAG is the start of a new tag.
-            if chunk_type == const.CHUNK_XML_START_TAG:
+            if chunkType == const.CHUNK_XML_START_TAG:
                 # The TAG consists of some fields:
                 # * (chunk_size, line_number, comment_index - we read before)
                 # * namespace_uri
@@ -269,43 +227,43 @@ class AXMLParser(object):
                 # * class_attribute
                 # After that, there are two lists of attributes, 20 bytes each
 
-                self.namespace_uri = unpack('<L', self.buff.read(4))[0]
-                self.name = unpack('<L', self.buff.read(4))[0]
+                self.m_namespaceUri = unpack('<L', self.buff.read(4))[0]
+                self.m_name = unpack('<L', self.buff.read(4))[0]
 
                 # FIXME
                 self.buff.read(4)  # flags
 
-                attribute_count = unpack('<L', self.buff.read(4))[0]
-                self.id_attribute = (attribute_count >> 16) - 1
-                attribute_count = attribute_count & 0xFFFF
-                self.class_attribute = unpack('<L', self.buff.read(4))[0]
-                self.style_attribute = (self.class_attribute >> 16) - 1
+                attributeCount = unpack('<L', self.buff.read(4))[0]
+                self.m_idAttribute = (attributeCount >> 16) - 1
+                attributeCount = attributeCount & 0xFFFF
+                self.m_classAttribute = unpack('<L', self.buff.read(4))[0]
+                self.m_styleAttribute = (self.m_classAttribute >> 16) - 1
 
-                self.class_attribute = (self.class_attribute & 0xFFFF) - 1
+                self.m_classAttribute = (self.m_classAttribute & 0xFFFF) - 1
 
                 # Now, we parse the attributes.
                 # Each attribute has 5 fields of 4 byte
-                for i in range(0, attribute_count * const.ATTRIBUTE_LENGHT):
+                for i in range(0, attributeCount * const.ATTRIBUTE_LENGHT):
                     # Each field is linearly parsed into the array
-                    self.attributes.append(unpack('<L', self.buff.read(4))[0])
+                    self.m_attributes.append(unpack('<L', self.buff.read(4))[0])
 
                 # Then there are class_attributes
-                for i in range(const.ATTRIBUTE_IX_VALUE_TYPE, len(self.attributes),
+                for i in range(const.ATTRIBUTE_IX_VALUE_TYPE, len(self.m_attributes),
                                const.ATTRIBUTE_LENGHT):
-                    self.attributes[i] = self.attributes[i] >> 24
+                    self.m_attributes[i] = self.m_attributes[i] >> 24
 
-                self.event = const.START_TAG
+                self.m_event = const.START_TAG
                 break
 
-            if chunk_type == const.CHUNK_XML_END_TAG:
-                self.namespace_uri = unpack('<L', self.buff.read(4))[0]
-                self.name = unpack('<L', self.buff.read(4))[0]
-                self.event = const.END_TAG
+            if chunkType == const.CHUNK_XML_END_TAG:
+                self.m_namespaceUri = unpack('<L', self.buff.read(4))[0]
+                self.m_name = unpack('<L', self.buff.read(4))[0]
+                self.m_event = const.END_TAG
                 break
 
-            if chunk_type == const.CHUNK_XML_TEXT:
+            if chunkType == const.CHUNK_XML_TEXT:
                 # TODO we do not know what the TEXT field does...
-                self.name = unpack('<L', self.buff.read(4))[0]
+                self.m_name = unpack('<L', self.buff.read(4))[0]
 
                 # FIXME
                 # Raw_value
@@ -313,111 +271,119 @@ class AXMLParser(object):
                 # typed_value, is an enum
                 self.buff.read(4)
 
-                self.event = const.TEXT
+                self.m_event = const.TEXT
                 break
 
-    def get_prefix_by_uri(self, uri):
+    def getPrefixByUri(self, uri):
         # As uri --> prefix is 1:n mapping,
         # We will just return the first one we match.
-        if uri not in self.uri_prefix:
+        if uri not in self.m_uriprefix:
             return -1
         else:
-            if len(self.uri_prefix[uri]) == 0:
+            if len(self.m_uriprefix[uri]) == 0:
                 return -1
-            return self.uri_prefix[uri][0]
+            return self.m_uriprefix[uri][0]
 
-    def get_prefix(self):
+    def getPrefix(self):
         # The default is, that the namespaceUri is 0xFFFFFFFF
         # Then we know, there is none
-        if self.namespace_uri == 0xFFFFFFFF:
-            return ''
+        if self.m_namespaceUri == 0xFFFFFFFF:
+            return u''
 
         # FIXME this could be problematic. Need to find the correct namespace prefix
-        if self.namespace_uri in self.uri_prefix:
-            candidate = self.uri_prefix[self.namespace_uri][0]
+        if self.m_namespaceUri in self.m_uriprefix:
+            candidate = self.m_uriprefix[self.m_namespaceUri][0]
             try:
-                return self.string_block.get_string(candidate)
+                return self.sb.getString(candidate)
             except KeyError:
-                return ''
+                return u''
         else:
-            return ''
+            return u''
 
-    def get_name(self):
-        if self.name == -1 or (
-                self.event != const.START_TAG and
-                self.event != const.END_TAG):
-            return ''
+    def getName(self):
+        if self.m_name == -1 or (
+                self.m_event != const.START_TAG and
+                self.m_event != const.END_TAG):
+            return u''
 
-        return self.string_block.get_string(self.name)
+        return self.sb.getString(self.m_name)
 
-    def get_text(self):
-        if self.name == -1 or self.event != const.TEXT:
-            return ''
+    def getText(self):
+        if self.m_name == -1 or self.m_event != const.TEXT:
+            return u''
 
-        return self.string_block.get_string(self.name)
+        return self.sb.getString(self.m_name)
 
-    def get_namespace_prefix(self, pos):
-        prefix = self.prefix_uri_list[pos][0]
-        return self.string_block.get_string(prefix)
+    def getNamespacePrefix(self, pos):
+        prefix = self.m_prefixuriL[pos][0]
+        return self.sb.getString(prefix)
 
-    def get_namespace_uri(self, pos):
-        uri = self.prefix_uri_list[pos][1]
-        return self.string_block.get_string(uri)
+    def getNamespaceUri(self, pos):
+        uri = self.m_prefixuriL[pos][1]
+        return self.sb.getString(uri)
 
-    def get_xml_namespace(self):
-        buff = ''
-        for prefix, uri in self.prefix_uri.items():
+    def getXMLNS(self):
+        buff = ""
+        for prefix, uri in self.m_prefixuri.items():
             if (uri, prefix) not in self.visited_ns:
-                prefix_str = self.string_block.get_string(prefix)
-                prefix_uri = self.string_block.get_string(self.prefix_uri[prefix])
+                prefix_str = self.sb.getString(prefix)
+                prefix_uri = self.sb.getString(self.m_prefixuri[prefix])
                 # FIXME Packers like Liapp use empty uri to fool XML Parser
                 # FIXME they also mess around with the Manifest, thus it can not be parsed easily
                 if prefix_uri == '':
-                    self.log.warning('Empty Namespace URI for Namespace {}.'.format(prefix_str))
-                    self.packer_warning = True
+                    log.warning("Empty Namespace URI for Namespace {}.".format(prefix_str))
+                    self.packerwarning = True
 
                 # if prefix is (null), which is indicated by an empty str, then do not print :
                 if prefix_str != '':
-                    prefix_str = ':' + prefix_str
+                    prefix_str = ":" + prefix_str
                 buff += 'xmlns{}="{}"\n'.format(prefix_str, prefix_uri)
                 self.visited_ns.append((uri, prefix))
         return buff
 
-    def get_namespace_count(self, pos):
+    def getNamespaceCount(self, pos):
         pass
 
-    def get_attribute_offset(self, index):
+    def getAttributeOffset(self, index):
         # FIXME
-        if self.event != const.START_TAG:
-            self.log.warning('Current event is not START_TAG.')
+        if self.m_event != const.START_TAG:
+            log.warning("Current event is not START_TAG.")
 
-        offset = (index * 5) - 5
+        offset = index * 5
         # FIXME
-        if offset >= len(self.attributes):
-            self.log.warning('Invalid attribute index')
+        if offset >= len(self.m_attributes):
+            log.warning("Invalid attribute index")
 
         return offset
 
-    def get_attribute_count(self):
-        return len(self.attributes) // const.ATTRIBUTE_LENGHT if self.event == const.START_TAG else -1
+    def getAttributeCount(self):
+        if self.m_event != const.START_TAG:
+            return -1
 
-    def get_attribute_prefix(self, index):
-        offset = self.get_attribute_offset(index)
-        uri = self.attributes[offset + const.ATTRIBUTE_IX_NAMESPACE_URI]
-        prefix = self.get_prefix_by_uri(uri)
-        return self.string_block.get_string(prefix) if prefix != -1 else ''
+        return len(self.m_attributes) // const.ATTRIBUTE_LENGHT
 
-    def get_attribute_name(self, index):
-        offset = self.get_attribute_offset(index)
-        name = self.attributes[offset + const.ATTRIBUTE_IX_NAME]
+    def getAttributePrefix(self, index):
+        offset = self.getAttributeOffset(index)
+        uri = self.m_attributes[offset + const.ATTRIBUTE_IX_NAMESPACE_URI]
+
+        prefix = self.getPrefixByUri(uri)
+
+        if prefix == -1:
+            return ""
+
+        return self.sb.getString(prefix)
+
+    def getAttributeName(self, index):
+        offset = self.getAttributeOffset(index)
+        name = self.m_attributes[offset + const.ATTRIBUTE_IX_NAME]
 
         if name == -1:
-            return ''
+            return ""
 
-        res = self.string_block.get_string(name)
+        res = self.sb.getString(name)
         # If the result is a (null) string, we need to look it up.
         if not res:
-            attr = self.resource_ids[name]
+            attr = self.m_resourceIDs[name]
             if attr in public.SYSTEM_RESOURCES['attributes']['inverse']:
                 res = 'android:' + public.SYSTEM_RESOURCES['attributes']['inverse'][
                     attr
@@ -429,15 +395,15 @@ class AXMLParser(object):
 
         return res
 
-    def get_attribute_value_type(self, index):
-        offset = self.get_attribute_offset(index)
-        return self.attributes[offset + const.ATTRIBUTE_IX_VALUE_TYPE]
+    def getAttributeValueType(self, index):
+        offset = self.getAttributeOffset(index)
+        return self.m_attributes[offset + const.ATTRIBUTE_IX_VALUE_TYPE]
 
-    def get_attribute_value_data(self, index):
-        offset = self.get_attribute_offset(index)
-        return self.attributes[offset + const.ATTRIBUTE_IX_VALUE_DATA]
+    def getAttributeValueData(self, index):
+        offset = self.getAttributeOffset(index)
+        return self.m_attributes[offset + const.ATTRIBUTE_IX_VALUE_DATA]
 
-    def get_attribute_value(self, index):
+    def getAttributeValue(self, index):
         """
         This function is only used to look up strings
         All other work is made by format_value
@@ -445,9 +411,9 @@ class AXMLParser(object):
         :param index:
         :return:
         """
-        offset = self.get_attribute_offset(index)
-        value_type = self.attributes[offset + const.ATTRIBUTE_IX_VALUE_TYPE]
-        if value_type == const.TYPE_STRING:
-            value_string = self.attributes[offset + const.ATTRIBUTE_IX_VALUE_STRING]
-            return self.string_block.get_string(value_string)
-        return ''
+        offset = self.getAttributeOffset(index)
+        valueType = self.m_attributes[offset + const.ATTRIBUTE_IX_VALUE_TYPE]
+        if valueType == const.TYPE_STRING:
+            valueString = self.m_attributes[offset + const.ATTRIBUTE_IX_VALUE_STRING]
+            return self.sb.getString(valueString)
+        return ""

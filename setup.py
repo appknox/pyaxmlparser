@@ -1,60 +1,48 @@
-#!/usr/bin/python
-# coding=utf-8
-
-from __future__ import absolute_import, unicode_literals
-
 from setuptools import find_packages, setup
-from codecs import open
-from os import path
-import pyaxmlparser
 
-here = path.abspath(path.dirname(__file__))
+__VERSION__ = '0.3.13'
 
-
-with open(path.join(here, 'README.rst'), 'r', encoding='utf-8') as f:
-    long_description = f.read()
+with open("README.rst", "r") as fh:
+    long_description = fh.read()
 
 setup(
-    name=pyaxmlparser.__package_name__,
-    version=pyaxmlparser.__version__,
-    url=pyaxmlparser.__url__,
-    author=pyaxmlparser.__author__,
-    author_email=pyaxmlparser.__author_email__,
-    license=pyaxmlparser.__license__,
+    name='pyaxmlparser',
+    version=__VERSION__,
+    url='https://github.com/appknox/pyaxmlparser',
+
+    author='Subho Halder',
+    author_email='sunny@appknox.com',
+    license='MIT',
+
     packages=find_packages(exclude=['tests', 'examples']),
-    python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*',
     include_package_data=True,
     zip_safe=False,
     platforms='any',
+    install_requires=['lxml', 'click==6.7'],
     entry_points='''
     [console_scripts]
-    apkinfo = pyaxmlparser.__main__:main
-    pyaxmlparser = pyaxmlparser.__main__:main
+    apkinfo = pyaxmlparser.cli:main
     ''',
     py_modules=['pyaxmlparser'],
-    description=pyaxmlparser.__description__,
+    description="Python3 Parser for Android XML file and get Application Name without using Androguard",
     long_description=long_description,
-    long_description_content_type='text/markdown',
+
     keywords='appknox axmlparser arscparser android',
     classifiers=[
         'Development Status :: 4 - Beta',
+
         'Intended Audience :: Developers',
+
         'License :: OSI Approved :: MIT License',
-        'Operating System :: MacOS :: MacOS X',
+
         'Operating System :: POSIX',
-        'Operating System :: POSIX :: BSD',
-        'Operating System :: POSIX :: Linux',
-        'Operating System :: Microsoft :: Windows',
+        'Operating System :: MacOS',
+        'Operating System :: Unix',
+
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: Implementation :: CPython',
-        'Programming Language :: Python :: Implementation :: PyPy'
+
         'Topic :: Software Development :: Build Tools',
         'Topic :: Software Development :: Libraries :: Python Modules',
     ]
