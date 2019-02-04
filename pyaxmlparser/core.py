@@ -335,7 +335,11 @@ class APK(object):
 
                 self.package = self.xml[i].get("package")
                 self.androidversion["Code"] = self.xml[i].get(self._ns("versionCode"))
+                if self.androidversion["Code"] is None:
+                    self.androidversion["Code"] = self.xml[i].get("versionCode")
                 self.androidversion["Name"] = self.xml[i].get(self._ns("versionName"))
+                if self.androidversion["Name"] is None:
+                    self.androidversion["Name"] = self.xml[i].get("versionName")
 
                 for item in self.xml[i].findall('uses-permission'):
                     name = item.get(self._ns("name"))
@@ -841,6 +845,9 @@ class APK(object):
                     continue
 
                 value = item.get(self._ns(attribute))
+
+                if value is None:
+                    value = item.get(attribute)
 
                 if value is not None:
                     return value
@@ -1879,7 +1886,7 @@ class APK(object):
         return self.get_app_name()
 
     @property
-    def package(self):
+    def packagename(self):
         return self.get_package()
 
     @property
