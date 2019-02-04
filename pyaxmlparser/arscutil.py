@@ -15,10 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import unicode_literals
+import logging
 from struct import unpack
 import pyaxmlparser.constants as const
 from pyaxmlparser.utils import format_value
+
+log = logging.getLogger("pyaxmlparser.arscutil")
 
 
 class ARSCResTablePackage(object):
@@ -31,11 +33,11 @@ class ARSCResTablePackage(object):
         self.lastPublicType = unpack('<I', buff.read(4))[0]
         self.keyStrings = unpack('<I', buff.read(4))[0]
         self.lastPublicKey = unpack('<I', buff.read(4))[0]
-        self.resource_id = self.id << 24
+        self.mResId = self.id << 24
 
     def get_name(self):
-        name = self.name.decode('utf-16', 'replace')
-        name = name[:name.find('\x00')]
+        name = self.name.decode("utf-16", 'replace')
+        name = name[:name.find("\x00")]
         return name
 
 
@@ -50,7 +52,7 @@ class ARSCHeader(object):
 
     def __repr__(self):
         return (
-            '<ARSCHeader idx=\'0x{:08x}\' type=\'{}\' header_size=\'{}\' size=\'{}\'>'
+            "<ARSCHeader idx='0x{:08x}' type='{}' header_size='{}' size='{}'>"
         ).format(self.start, self.type, self.header_size, self.size)
 
 
@@ -77,27 +79,27 @@ class ARSCResType(object):
         self.res1 = unpack('<h', buff.read(2))[0]
         self.entryCount = unpack('<i', buff.read(4))[0]
         self.entriesStart = unpack('<i', buff.read(4))[0]
-        self.resource_id = (0xff000000 & self.parent.get_resource_id()) | self.id << 16
-        self.parent.set_resource_id(self.resource_id)
+        self.mResId = (0xff000000 & self.parent.get_mResId()) | self.id << 16
+        self.parent.set_mResId(self.mResId)
 
         self.config = ARSCResTableConfig(buff)
 
     def get_type(self):
-        return self.parent.table_strings.get_string(self.id - 1)
+        return self.parent.mTableStrings.getString(self.id - 1)
 
     def get_package_name(self):
         return self.parent.get_package_name()
 
     def __repr__(self):
-        return 'ARSCResType(%x, %x, %x, %x, %x, %x, %x, %s)' % (
+        return "ARSCResType(%x, %x, %x, %x, %x, %x, %x, %s)" % (
             self.start,
             self.id,
             self.res0,
             self.res1,
             self.entryCount,
             self.entriesStart,
-            self.resource_id,
-            'table:' + self.parent.table_strings.get_string(self.id - 1)
+            self.mResId,
+            "table:" + self.parent.mTableStrings.getString(self.id - 1)
         )
 
 
@@ -178,6 +180,7 @@ class ARSCResTableConfig(object):
 
             self.exceedingSize = self.size - 36
             if self.exceedingSize > 0:
+                log.debug("Skipping padding bytes!")
                 self.padding = buff.read(self.exceedingSize)
 
         # TODO there is screenConfig2
@@ -190,7 +193,7 @@ class ARSCResTableConfig(object):
                 ((kwargs.pop('mnc', 0) & 0xffff) << 16)
 
             self.locale = 0
-            for char_ix, char in kwargs.pop('locale', '')[0:4]:
+            for char_ix, char in kwargs.pop('locale', "")[0:4]:
                 self.locale += (ord(char) << (char_ix * 8))
 
             self.screenType = \
@@ -224,7 +227,7 @@ class ARSCResTableConfig(object):
             self.exceedingSize = 0
 
     def _unpack_language_or_region(self, char_in, char_base):
-        char_out = ''
+        char_out = ""
         if char_in[0] & 0x80:
             first = char_in[1] & 0x1f
             second = ((char_in[1] & 0xe0) >> 5) + ((char_in[0] & 0x03) << 3)
@@ -250,8 +253,8 @@ class ARSCResTableConfig(object):
                 ],
                 ord('0')
             )
-            return (_language + '-r' + _region) if _region else _language
-        return ''
+            return (_language + "-r" + _region) if _region else _language
+        return ""
 
     def get_config_name_friendly(self):
         res = []
@@ -259,9 +262,9 @@ class ARSCResTableConfig(object):
         mcc = self.imsi & 0xFFFF
         mnc = (self.imsi & 0xFFFF0000) >> 16
         if mcc != 0:
-            res.append('mcc%d' % mcc)
+            res.append("mcc%d" % mcc)
         if mnc != 0:
-            res.append('mnc%d' % mnc)
+            res.append("mnc%d" % mnc)
 
         if self.locale != 0:
             res.append(self.get_language_and_region())
@@ -269,50 +272,50 @@ class ARSCResTableConfig(object):
         screenLayout = self.screenConfig & 0xff
         if (screenLayout & const.MASK_LAYOUTDIR) != 0:
             if screenLayout & const.MASK_LAYOUTDIR == const.LAYOUTDIR_LTR:
-                res.append('ldltr')
+                res.append("ldltr")
             elif screenLayout & const.MASK_LAYOUTDIR == const.LAYOUTDIR_RTL:
-                res.append('ldrtl')
+                res.append("ldrtl")
             else:
                 res.append(
-                    'layoutDir_%d' % (screenLayout & const.MASK_LAYOUTDIR))
+                    "layoutDir_%d" % (screenLayout & const.MASK_LAYOUTDIR))
 
         smallestScreenWidthDp = (self.screenConfig & 0xFFFF0000) >> 16
         if smallestScreenWidthDp != 0:
-            res.append('sw%ddp' % smallestScreenWidthDp)
+            res.append("sw%ddp" % smallestScreenWidthDp)
 
         screenWidthDp = self.screenSizeDp & 0xFFFF
         screenHeightDp = (self.screenSizeDp & 0xFFFF0000) >> 16
         if screenWidthDp != 0:
-            res.append('w%ddp' % screenWidthDp)
+            res.append("w%ddp" % screenWidthDp)
         if screenHeightDp != 0:
-            res.append('h%ddp' % screenHeightDp)
+            res.append("h%ddp" % screenHeightDp)
 
         if (screenLayout & const.MASK_SCREENSIZE) != const.SCREENSIZE_ANY:
             if screenLayout & const.MASK_SCREENSIZE == const.SCREENSIZE_SMALL:
-                res.append('small')
+                res.append("small")
             elif screenLayout & \
                     const.MASK_SCREENSIZE == const.SCREENSIZE_NORMAL:
-                res.append('normal')
+                res.append("normal")
             elif screenLayout & \
                     const.MASK_SCREENSIZE == const.SCREENSIZE_LARGE:
-                res.append('large')
+                res.append("large")
             elif screenLayout & \
                     const.MASK_SCREENSIZE == const.SCREENSIZE_XLARGE:
-                res.append('xlarge')
+                res.append("xlarge")
             else:
                 res.append(
-                    'screenLayoutSize_%d' % (
+                    "screenLayoutSize_%d" % (
                         screenLayout & const.MASK_SCREENSIZE
                     )
                 )
         if (screenLayout & const.MASK_SCREENLONG) != 0:
             if screenLayout & const.MASK_SCREENLONG == const.SCREENLONG_NO:
-                res.append('notlong')
+                res.append("notlong")
             elif screenLayout & const.MASK_SCREENLONG == const.SCREENLONG_YES:
-                res.append('long')
+                res.append("long")
             else:
                 res.append(
-                    'screenLayoutLong_%d' % (
+                    "screenLayoutLong_%d" % (
                         screenLayout & const.MASK_SCREENLONG
                     )
                 )
@@ -320,52 +323,52 @@ class ARSCResTableConfig(object):
         density = (self.screenType & 0xffff0000) >> 16
         if density != const.DENSITY_DEFAULT:
             if density == const.DENSITY_LOW:
-                res.append('ldpi')
+                res.append("ldpi")
             elif density == const.DENSITY_MEDIUM:
-                res.append('mdpi')
+                res.append("mdpi")
             elif density == const.DENSITY_TV:
-                res.append('tvdpi')
+                res.append("tvdpi")
             elif density == const.DENSITY_HIGH:
-                res.append('hdpi')
+                res.append("hdpi")
             elif density == const.DENSITY_XHIGH:
-                res.append('xhdpi')
+                res.append("xhdpi")
             elif density == const.DENSITY_XXHIGH:
-                res.append('xxhdpi')
+                res.append("xxhdpi")
             elif density == const.DENSITY_XXXHIGH:
-                res.append('xxxhdpi')
+                res.append("xxxhdpi")
             elif density == const.DENSITY_NONE:
-                res.append('nodpi')
+                res.append("nodpi")
             elif density == const.DENSITY_ANY:
-                res.append('anydpi')
+                res.append("anydpi")
             else:
-                res.append('%ddpi' % (density))
+                res.append("%ddpi" % (density))
 
         touchscreen = (self.screenType & 0xff00) >> 8
         if touchscreen != const.TOUCHSCREEN_ANY:
             if touchscreen == const.TOUCHSCREEN_NOTOUCH:
-                res.append('notouch')
+                res.append("notouch")
             elif touchscreen == const.TOUCHSCREEN_FINGER:
-                res.append('finger')
+                res.append("finger")
             elif touchscreen == const.TOUCHSCREEN_STYLUS:
-                res.append('stylus')
+                res.append("stylus")
             else:
-                res.append('touchscreen_%d' % touchscreen)
+                res.append("touchscreen_%d" % touchscreen)
 
         screenSize = self.screenSize
         if screenSize != 0:
             screenWidth = self.screenSize & 0xffff
             screenHeight = (self.screenSize & 0xffff0000) >> 16
-            res.append('%dx%d' % (screenWidth, screenHeight))
+            res.append("%dx%d" % (screenWidth, screenHeight))
 
         version = self.version
         if version != 0:
             sdkVersion = self.version & 0xffff
             minorVersion = (self.version & 0xffff0000) >> 16
-            res.append('v%d' % sdkVersion)
+            res.append("v%d" % sdkVersion)
             if minorVersion != 0:
-                res.append('.%d' % minorVersion)
+                res.append(".%d" % minorVersion)
 
-        return '-'.join(res)
+        return "-".join(res)
 
     def get_language(self):
         x = self.locale & 0x0000ffff
@@ -398,7 +401,7 @@ class ARSCResTableConfig(object):
         return self._get_tuple() == other._get_tuple()
 
     def __repr__(self):
-        return '<ARSCResTableConfig \'{}\'>'.format(repr(self._get_tuple()))
+        return "<ARSCResTableConfig '{}'>".format(repr(self._get_tuple()))
 
 
 class ARSCResTableEntry(object):
@@ -406,9 +409,9 @@ class ARSCResTableEntry(object):
     FLAG_PUBLIC = 2
     FLAG_WEAK = 4
 
-    def __init__(self, buff, resource_id, parent=None):
+    def __init__(self, buff, mResId, parent=None):
         self.start = buff.get_idx()
-        self.resource_id = resource_id
+        self.mResId = mResId
         self.parent = parent
         self.size = unpack('<H', buff.read(2))[0]
         self.flags = unpack('<H', buff.read(2))[0]
@@ -424,7 +427,7 @@ class ARSCResTableEntry(object):
         return self.index
 
     def get_value(self):
-        return self.parent.key_strings.get_string(self.index)
+        return self.parent.mKeyStrings.getString(self.index)
 
     def get_key_data(self):
         return self.key.get_data_value()
@@ -440,11 +443,11 @@ class ARSCResTableEntry(object):
 
     def __repr__(self):
         return (
-            '<ARSCResTableEntry idx=\'0x{:08x}\' resource_id=\'0x{:08x}\' size=\'{}\' '
-            'flags=\'0x{:02x}\' index=\'0x{:x}\' holding={}>'
+            "<ARSCResTableEntry idx='0x{:08x}' mResId='0x{:08x}' size='{}' "
+            "flags='0x{:02x}' index='0x{:x}' holding={}>"
         ).format(
             self.start,
-            self.resource_id,
+            self.mResId,
             self.size,
             self.flags,
             self.index,
@@ -465,7 +468,7 @@ class ARSCComplex(object):
                                ARSCResStringPoolRef(buff, self.parent)))
 
     def __repr__(self):
-        return '<ARSCComplex idx=\'0x{:08x}\' parent=\'{}\' count=\'{}\'>'.format(
+        return "<ARSCComplex idx='0x{:08x}' parent='{}' count='{}'>".format(
             self.start, self.id_parent, self.count)
 
 
@@ -474,14 +477,14 @@ class ARSCResStringPoolRef(object):
         self.start = buff.get_idx()
         self.parent = parent
 
-        self.size, = unpack('<H', buff.read(2))
-        self.res0, = unpack('<B', buff.read(1))
-        assert self.res0 == 0, 'res0 must be always zero!'
+        self.size, = unpack("<H", buff.read(2))
+        self.res0, = unpack("<B", buff.read(1))
+        assert self.res0 == 0, "res0 must be always zero!"
         self.data_type = unpack('<B', buff.read(1))[0]
         self.data = unpack('<I', buff.read(4))[0]
 
     def get_data_value(self):
-        return self.parent.string_pool_main.get_string(self.data)
+        return self.parent.stringpool_main.getString(self.data)
 
     def get_data(self):
         return self.data
@@ -496,7 +499,7 @@ class ARSCResStringPoolRef(object):
         return format_value(
             self.data_type,
             self.data,
-            self.parent.string_pool_main.get_string
+            self.parent.stringpool_main.getString
         )
 
     def is_reference(self):
@@ -504,13 +507,14 @@ class ARSCResStringPoolRef(object):
 
     def __repr__(self):
         return (
-            '<ARSCResStringPoolRef idx=\'0x{:08x}\' size=\'{}\' '
-            'type=\'{}\' data=\'0x{:08x}\'>'
+            "<ARSCResStringPoolRef idx='0x{:08x}' size='{}' "
+            "type='{}' data='0x{:08x}'>"
         ).format(
             self.start,
             self.size,
-            const.TYPE_TABLE.get(self.data_type, '0x%x' % self.data_type),
+            const.TYPE_TABLE.get(self.data_type, "0x%x" % self.data_type),
             self.data)
+        return self.data_type
 
 
 def get_arsc_info(arscobj):
@@ -520,18 +524,18 @@ def get_arsc_info(arscobj):
     :param arscobj: :class:`~ARSCParser`
     :return: a string
     """
-    buff = ''
+    buff = ""
     for package in arscobj.get_packages_names():
-        buff += package + ':\n'
+        buff += package + ":\n"
         for locale in arscobj.get_locales(package):
-            buff += '\t' + repr(locale) + ':\n'
+            buff += "\t" + repr(locale) + ":\n"
             for ttype in arscobj.get_types(package, locale):
-                buff += '\t\t' + ttype + ':\n'
+                buff += "\t\t" + ttype + ":\n"
                 try:
-                    tmp_buff = getattr(arscobj, 'get_' + ttype + '_resources')(
-                        package, locale).decode('utf-8', 'replace').split('\n')
+                    tmp_buff = getattr(arscobj, "get_" + ttype + "_resources")(
+                        package, locale).decode("utf-8", 'replace').split("\n")
                     for i in tmp_buff:
-                        buff += '\t\t\t' + i + '\n'
+                        buff += "\t\t\t" + i + "\n"
                 except AttributeError:
                     pass
     return buff
