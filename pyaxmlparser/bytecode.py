@@ -361,4 +361,3 @@ class Node(object):
         self.id = n
         self.title = s
         self.children = []
-

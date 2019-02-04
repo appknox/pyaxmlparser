@@ -1119,6 +1119,7 @@ class APK(object):
         """
         return self.declared_permissions
 
+    @property
     def get_max_sdk_version(self):
         """
             Return the android:maxSdkVersion attribute
@@ -1127,6 +1128,7 @@ class APK(object):
         """
         return self.get_element("uses-sdk", "maxSdkVersion")
 
+    @property
     def get_min_sdk_version(self):
         """
             Return the android:minSdkVersion attribute
@@ -1143,6 +1145,7 @@ class APK(object):
         """
         return self.get_element("uses-sdk", "targetSdkVersion")
 
+    @property
     def get_effective_target_sdk_version(self):
         """
             Return the effective targetSdkVersion, always returns int > 0.
@@ -1870,6 +1873,39 @@ class APK(object):
             print("CERTIFICATES v2:")
             for c in self.get_certificates_v2():
                 show_Certificate(c)
+
+    @property
+    def application(self):
+        return self.get_app_name()
+
+    @property
+    def package(self):
+        return self.get_package()
+
+    @property
+    def version_name(self):
+        return self.get_androidversion_name()
+
+    @property
+    def version_code(self):
+        return self.get_androidversion_code()
+
+    @property
+    def icon_info(self):
+        return self.get_app_icon()
+
+    @property
+    def icon_data(self):
+        app_icon_file = self.get_app_icon()
+        app_icon_data = None
+        try:
+            app_icon_data = self.get_file(app_icon_file)
+        except FileNotPresent:
+            try:
+                app_icon_data = self.get_file(app_icon_file.encode().decode('cp437'))
+            except FileNotPresent:
+                pass
+        return app_icon_data
 
 
 def show_Certificate(cert, short=False):
