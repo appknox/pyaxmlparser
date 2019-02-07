@@ -209,13 +209,15 @@ class APK(object):
     _APK_SIG_ATTR_V2_STRIPPING_PROTECTION = 0xbeeff00d
 
     _APK_SIG_ALGO_IDS = {
-        0x0101 : "RSASSA-PSS with SHA2-256 digest, SHA2-256 MGF1, 32 bytes of salt, trailer: 0xbc",
-        0x0102 : "RSASSA-PSS with SHA2-512 digest, SHA2-512 MGF1, 64 bytes of salt, trailer: 0xbc",
-        0x0103 : "RSASSA-PKCS1-v1_5 with SHA2-256 digest.", # This is for build systems which require deterministic signatures.
-        0x0104 : "RSASSA-PKCS1-v1_5 with SHA2-512 digest.", # This is for build systems which require deterministic signatures.
-        0x0201 : "ECDSA with SHA2-256 digest",
-        0x0202 : "ECDSA with SHA2-512 digest",
-        0x0301 : "DSA with SHA2-256 digest",
+        0x0101: "RSASSA-PSS with SHA2-256 digest, SHA2-256 MGF1, 32 bytes of salt, trailer: 0xbc",
+        0x0102: "RSASSA-PSS with SHA2-512 digest, SHA2-512 MGF1, 64 bytes of salt, trailer: 0xbc",
+        # This is for build systems which require deterministic signatures.
+        0x0103: "RSASSA-PKCS1-v1_5 with SHA2-256 digest.",
+        # This is for build systems which require deterministic signatures.
+        0x0104: "RSASSA-PKCS1-v1_5 with SHA2-512 digest.",
+        0x0201: "ECDSA with SHA2-256 digest",
+        0x0202: "ECDSA with SHA2-512 digest",
+        0x0301: "DSA with SHA2-256 digest",
     }
 
     def __init__(self, filename, raw=False, magic_file=None, skip_analysis=False, testzip=False):
@@ -231,7 +233,8 @@ class APK(object):
         :param raw: specify if the filename is a path or raw data (optional)
         :param magic_file: specify the magic file (not used anymore - legacy only)
         :param skip_analysis: Skip the analysis, e.g. no manifest files are read. (default: False)
-        :param testzip: Test the APK for integrity, e.g. if the ZIP file is broken. Throw an exception on failure (default False)
+        :param testzip: Test the APK for integrity, e.g. if the ZIP file is broken.
+        Throw an exception on failure (default False)
 
         :type filename: string
         :type raw: boolean
@@ -1332,7 +1335,10 @@ class APK(object):
 
         :return: True if 'android.hardware.touchscreen' is not required, False otherwise
         """
-        return self.get_attribute_value('uses-feature', 'name', required="false", name="android.hardware.touchscreen") == "android.hardware.touchscreen"
+        return self.get_attribute_value(
+            'uses-feature', 'name', required="false",
+            name="android.hardware.touchscreen"
+        ) == "android.hardware.touchscreen"
 
     def get_certificate_der(self, filename):
         """
@@ -1424,7 +1430,8 @@ class APK(object):
 
     def get_android_resources(self):
         """
-        Return the :class:`~androguard.core.bytecodes.axml.ARSCParser` object which corresponds to the resources.arsc file
+        Return the :class:`~androguard.core.bytecodes.axml.ARSCParser`
+        object which corresponds to the resources.arsc file
 
         :rtype: :class:`~androguard.core.bytecodes.axml.ARSCParser`
         """
@@ -1631,7 +1638,6 @@ class APK(object):
             len_digests = self.read_uint32_le(signed_data)
             raw_digests = signed_data.read(len_digests)
             digests = self.parse_signatures_or_digests(raw_digests)
-
 
             # Certs
             certs = []
