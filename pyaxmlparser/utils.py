@@ -95,3 +95,14 @@ def format_value(_type, _data, lookup_string=lambda ix: "<string>"):
         return "%d" % long2int(_data)
 
     return "<0x%X, type 0x%02X>" % (_data, _type)
+
+
+def read(filename, binary=True):
+    """
+    Open and read a file
+    :param filename: filename to open and read
+    :param binary: True if the file should be read as binary
+    :return: bytes if binary is True, str otherwise
+    """
+    with open(filename, 'rb' if binary else 'r') as f:
+        return f.read()

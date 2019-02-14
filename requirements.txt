@@ -1,5 +1,6 @@
 lxml==3.7.3
 click==6.7
+asn1crypto==0.24.0
 
 # testing
 pytest==3.0.6

@@ -13,6 +13,6 @@ def main(filename):
 
     click.echo('APK: {}'.format(filename))
     click.echo('App name: {}'.format(apk.application))
-    click.echo('Package: {}'.format(apk.package))
+    click.echo('Package: {}'.format(apk.packagename))
     click.echo('Version name: {}'.format(apk.version_name))
     click.echo('Version code: {}'.format(apk.version_code))
