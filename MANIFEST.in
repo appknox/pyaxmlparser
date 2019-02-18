@@ -1,3 +1,4 @@
 include *.txt
 include *.json
 include *.xml
+include pyaxmlparser/resources/*
