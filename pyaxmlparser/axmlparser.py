@@ -18,13 +18,18 @@
 import logging
 from struct import unpack
 
-import pyaxmlparser.constants as const
-from pyaxmlparser import bytecode
-from pyaxmlparser.stringblock import StringBlock
-from pyaxmlparser.resources import public
-from .arscutil import ARSCHeader
-
-log = logging.getLogger("pyaxmlparser.axmlparser")
+try:
+    from .arscutil import ARSCHeader
+    from .stringblock import StringBlock
+    from .resources import public
+    from . import constants as const
+    from . import bytecode
+except (ValueError, ImportError):
+    from arscutil import ARSCHeader
+    from stringblock import StringBlock
+    from resources import public
+    import constants as const
+    import bytecode
 
 
 class AXMLParser(object):
@@ -41,16 +46,19 @@ class AXMLParser(object):
     But there are several examples where the `type` is set to something
     else, probably in order to fool parsers.
 
-    Typically the AXMLParser is used in a loop which terminates if `m_event` is set to `END_DOCUMENT`.
+    Typically the AXMLParser is used in a loop which terminates if `event` is set to `END_DOCUMENT`.
     You can use the `next()` function to get the next chunk.
     Note that not all chunk types are yielded from the iterator! Some chunks are processed in
     the AXMLParser only.
-    The parser will set `is_valid()` to False if it parses something not valid.
+    The parser will set `is_valid` to False if it parses something not valid.
     Messages what is wrong are logged.
 
     See http://androidxref.com/9.0.0_r3/xref/frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h#563
     """
-    def __init__(self, raw_buff):
+
+    def __init__(self, raw_buff, debug=False):
+        self.log = logging.getLogger("pyaxmlparser.axmlparser")
+        self.log.setLevel(logging.DEBUG if debug else logging.CRITICAL)
         self._reset()
 
         self._valid = True
@@ -59,21 +67,29 @@ class AXMLParser(object):
 
         # Minimum is a single ARSCHeader, which would be a strange edge case...
         if self.buff.size() < 8:
-            log.error("Filesize is too small to be a valid AXML file! Filesize: {}".format(self.buff.size()))
+            self.log.error(
+                "Filesize is too small to be a valid AXML file! Filesize: {}".format(
+                    self.buff.size()
+                )
+            )
             self._valid = False
             return
 
         # This would be even stranger, if an AXML file is larger than 4GB...
         # But this is not possible as the maximum chunk size is a unsigned 4 byte int.
         if self.buff.size() > 0xFFFFFFFF:
-            log.error("Filesize is too large to be a valid AXML file! Filesize: {}".format(self.buff.size()))
+            self.log.error(
+                "Filesize is too large to be a valid AXML file! Filesize: {}".format(
+                    self.buff.size()
+                )
+            )
             self._valid = False
             return
 
         try:
             axml_header = ARSCHeader(self.buff)
         except AssertionError as e:
-            log.error("Error parsing first resource header: %s", e)
+            self.log.error("Error parsing first resource header: %s", e)
             self._valid = False
             return
 
@@ -82,10 +98,12 @@ class AXMLParser(object):
         if axml_header.header_size == 28024:
             # Can be a common error: the file is not an AXML but a plain XML
             # The file will then usually start with '<?xm' / '3C 3F 78 6D'
-            log.warning("Header size is 28024! Are you trying to parse a plain XML file?")
+            self.log.warning(
+                "Header size is 28024! Are you trying to parse a plain XML file?"
+            )
 
         if axml_header.header_size != 8:
-            log.error(
+            self.log.error(
                 "This does not look like an AXML file. "
                 "header size does not equal 8! header size = {}".format(
                     axml_header.header_size
@@ -95,7 +113,7 @@ class AXMLParser(object):
             return
 
         if self.filesize > self.buff.size():
-            log.error(
+            self.log.error(
                 "This does not look like an AXML file. "
                 "Declared filesize does not match real size: {} vs {}".format(
                     self.filesize, self.buff.size()
@@ -107,7 +125,7 @@ class AXMLParser(object):
         if self.filesize < self.buff.size():
             # The file can still be parsed up to the point where the chunk should end.
             self.axml_tampered = True
-            log.warning(
+            self.log.warning(
                 "Declared filesize ({}) is smaller than total file size ({}). "
                 "Was something appended to the file? Trying to parse it anyways.".format(
                     self.filesize, self.buff.size()
@@ -118,7 +136,7 @@ class AXMLParser(object):
         # set correctly
         if axml_header.type != const.RES_XML_TYPE:
             self.axml_tampered = True
-            log.warning(
+            self.log.warning(
                 "AXML file has an unusual resource type! "
                 "Malware likes to to such stuff to anti androguard! "
                 "But we try to parse it anyways. "
@@ -129,22 +147,20 @@ class AXMLParser(object):
         try:
             header = ARSCHeader(self.buff)
         except AssertionError as e:
-            log.error("Error parsing resource header of string pool: %s", e)
+            self.log.error("Error parsing resource header of string pool: %s", e)
             self._valid = False
             return
 
         if header.header_size != 0x1C:
-            log.error(
+            self.log.error(
                 "This does not look like an AXML file. String chunk header "
-                "size does not equal 28! header size = {}".format(
-                    header.header_size
-                )
+                "size does not equal 28! header size = {}".format(header.header_size)
             )
             self._valid = False
             return
 
         if header.type != const.RES_STRING_POOL_TYPE:
-            log.error(
+            self.log.error(
                 "Expected String Pool header, got resource type 0x{:04x} "
                 "instead".format(header.type)
             )
@@ -154,11 +170,12 @@ class AXMLParser(object):
         self.sb = StringBlock(self.buff, header)
 
         # Stores resource ID mappings, if any
-        self.m_resourceIDs = []
+        self.resource_ids = []
 
         # Store a list of prefix/uri mappings encountered
         self.namespaces = []
 
+    @property
     def is_valid(self):
         """
         Get the state of the AXMLPrinter.
@@ -168,7 +185,7 @@ class AXMLParser(object):
         return self._valid
 
     def _reset(self):
-        self.m_event = -1
+        self.event = -1
         self.m_lineNumber = -1
         self.m_name = -1
         self.m_namespaceUri = -1
@@ -179,56 +196,63 @@ class AXMLParser(object):
 
     def __next__(self):
         self._do_next()
-        return self.m_event
+        return self.event
 
     def _do_next(self):
-        if self.m_event == const.END_DOCUMENT:
+        if self.event == const.END_DOCUMENT:
             return
 
         self._reset()
         while self._valid:
             # Stop at the declared filesize or at the end of the file
             if self.buff.end() or self.buff.get_idx() == self.filesize:
-                self.m_event = const.END_DOCUMENT
+                self.event = const.END_DOCUMENT
                 break
 
             # Again, we read an ARSCHeader
             try:
                 h = ARSCHeader(self.buff)
             except AssertionError as e:
-                log.error("Error parsing resource header: %s", e)
+                self.log.error("Error parsing resource header: %s", e)
                 self._valid = False
                 return
 
             # Special chunk: Resource Map. This chunk might be contained inside
             # the file, after the string pool.
             if h.type == const.RES_XML_RESOURCE_MAP_TYPE:
-                log.debug("AXML contains a RESOURCE MAP")
+                self.log.debug("AXML contains a RESOURCE MAP")
                 # Check size: < 8 bytes mean that the chunk is not complete
                 # Should be aligned to 4 bytes.
                 if h.size < 8 or (h.size % 4) != 0:
-                    log.error("Invalid chunk size in chunk XML_RESOURCE_MAP")
+                    self.log.error("Invalid chunk size in chunk XML_RESOURCE_MAP")
                     self._valid = False
                     return
 
                 for i in range((h.size - h.header_size) // 4):
-                    self.m_resourceIDs.append(unpack('<L', self.buff.read(4))[0])
+                    self.resource_ids.append(unpack("<L", self.buff.read(4))[0])
 
                 continue
 
             # Parse now the XML chunks.
             # unknown chunk types might cause problems, but we can skip them!
-            if h.type < const.RES_XML_FIRST_CHUNK_TYPE or h.type > const.RES_XML_LAST_CHUNK_TYPE:
+            if (
+                h.type < const.RES_XML_FIRST_CHUNK_TYPE
+                or h.type > const.RES_XML_LAST_CHUNK_TYPE
+            ):
                 # h.size is the size of the whole chunk including the header.
                 # We read already 8 bytes of the header, thus we need to
                 # subtract them.
-                log.error("Not a XML resource chunk type: 0x{:04x}. Skipping {} bytes".format(h.type, h.size))
+                self.log.error(
+                    "Not a XML resource chunk type: 0x{:04x}. Skipping {} bytes".format(
+                        h.type, h.size
+                    )
+                )
                 self.buff.set_idx(h.end)
                 continue
 
             # Check that we read a correct header
             if h.header_size != 0x10:
-                log.error(
+                self.log.error(
                     "XML Resource Type Chunk header size does not match 16! "
                     "At chunk type 0x{:04x}, declared header size={}, "
                     "chunk size={}".format(h.type, h.header_size, h.size)
@@ -237,41 +261,45 @@ class AXMLParser(object):
                 return
 
             # Line Number of the source file, only used as meta information
-            self.m_lineNumber, = unpack('<L', self.buff.read(4))
+            self.m_lineNumber, = unpack("<L", self.buff.read(4))
 
             # Comment_Index (usually 0xFFFFFFFF)
-            self.m_comment_index, = unpack('<L', self.buff.read(4))
+            self.m_comment_index, = unpack("<L", self.buff.read(4))
 
             if self.m_comment_index != 0xFFFFFFFF and h.type in [
-                    const.RES_XML_START_NAMESPACE_TYPE,
-                    const.RES_XML_END_NAMESPACE_TYPE]:
-                log.warning("Unhandled Comment at namespace chunk: '{}'".format(
-                    self.sb[self.m_comment_index])
+                const.RES_XML_START_NAMESPACE_TYPE,
+                const.RES_XML_END_NAMESPACE_TYPE,
+            ]:
+                self.log.warning(
+                    "Unhandled Comment at namespace chunk: '{}'".format(
+                        self.sb[self.m_comment_index]
+                    )
                 )
 
             if h.type == const.RES_XML_START_NAMESPACE_TYPE:
-                prefix, = unpack('<L', self.buff.read(4))
-                uri, = unpack('<L', self.buff.read(4))
+                prefix, = unpack("<L", self.buff.read(4))
+                uri, = unpack("<L", self.buff.read(4))
 
                 s_prefix = self.sb[prefix]
                 s_uri = self.sb[uri]
 
-                log.debug(
+                self.log.debug(
                     "Start of Namespace mapping: prefix "
-                    "{}: '{}' --> uri {}: '{}'".format(
-                        prefix, s_prefix, uri, s_uri
-                    )
+                    "{}: '{}' --> uri {}: '{}'".format(prefix, s_prefix, uri, s_uri)
                 )
 
-                if s_uri == '':
-                    log.warning("Namespace prefix '{}' resolves to empty URI. "
-                                "This might be a packer.".format(s_prefix))
+                if s_uri == "":
+                    self.log.warning(
+                        "Namespace prefix '{}' resolves to empty URI. "
+                        "This might be a packer.".format(s_prefix)
+                    )
 
                 if (prefix, uri) in self.namespaces:
-                    log.info(
+                    self.log.info(
                         "Namespace mapping ({}, {}) already seen! "
                         "This is usually not a problem but could indicate "
-                        "packers or broken AXML compilers.".format(prefix, uri))
+                        "packers or broken AXML compilers.".format(prefix, uri)
+                    )
                 self.namespaces.append((prefix, uri))
 
                 # We can continue with the next chunk, as we store the namespace
@@ -280,14 +308,14 @@ class AXMLParser(object):
 
             if h.type == const.RES_XML_END_NAMESPACE_TYPE:
                 # END_PREFIX contains again prefix and uri field
-                prefix, = unpack('<L', self.buff.read(4))
-                uri, = unpack('<L', self.buff.read(4))
+                prefix, = unpack("<L", self.buff.read(4))
+                uri, = unpack("<L", self.buff.read(4))
 
                 # We remove the last namespace mapping matching
                 if (prefix, uri) in self.namespaces:
                     self.namespaces.remove((prefix, uri))
                 else:
-                    log.warning(
+                    self.log.warning(
                         "Reached a NAMESPACE_END without having the namespace stored before? "
                         "Prefix ID: {}, URI ID: {}".format(prefix, uri)
                     )
@@ -308,18 +336,18 @@ class AXMLParser(object):
                 # After that, there are two lists of attributes, 20 bytes each
 
                 # Namespace URI (String ID)
-                self.m_namespaceUri, = unpack('<L', self.buff.read(4))
+                self.m_namespaceUri, = unpack("<L", self.buff.read(4))
                 # Name of the Tag (String ID)
-                self.m_name, = unpack('<L', self.buff.read(4))
+                self.m_name, = unpack("<L", self.buff.read(4))
                 # FIXME: Flags
                 _ = self.buff.read(4)  # noqa
                 # Attribute Count
-                attributeCount, = unpack('<L', self.buff.read(4))
+                attribute_count, = unpack("<L", self.buff.read(4))
                 # Class Attribute
-                self.m_classAttribute, = unpack('<L', self.buff.read(4))
+                self.m_classAttribute, = unpack("<L", self.buff.read(4))
 
-                self.m_idAttribute = (attributeCount >> 16) - 1
-                self.m_attribute_count = attributeCount & 0xFFFF
+                self.m_idAttribute = (attribute_count >> 16) - 1
+                self.m_attribute_count = attribute_count & 0xFFFF
                 self.m_styleAttribute = (self.m_classAttribute >> 16) - 1
                 self.m_classAttribute = (self.m_classAttribute & 0xFFFF) - 1
 
@@ -333,20 +361,24 @@ class AXMLParser(object):
                     # * Value
                     # * Type
                     # * Data
-                    self.m_attributes.append(unpack('<L', self.buff.read(4))[0])
+                    self.m_attributes.append(unpack("<L", self.buff.read(4))[0])
 
                 # Then there are class_attributes
-                for i in range(const.ATTRIBUTE_IX_VALUE_TYPE, len(self.m_attributes), const.ATTRIBUTE_LENGHT):
+                for i in range(
+                    const.ATTRIBUTE_IX_VALUE_TYPE,
+                    len(self.m_attributes),
+                    const.ATTRIBUTE_LENGHT,
+                ):
                     self.m_attributes[i] = self.m_attributes[i] >> 24
 
-                self.m_event = const.START_TAG
+                self.event = const.START_TAG
                 break
 
             if h.type == const.RES_XML_END_ELEMENT_TYPE:
-                self.m_namespaceUri, = unpack('<L', self.buff.read(4))
-                self.m_name, = unpack('<L', self.buff.read(4))
+                self.m_namespaceUri, = unpack("<L", self.buff.read(4))
+                self.m_name, = unpack("<L", self.buff.read(4))
 
-                self.m_event = const.END_TAG
+                self.event = const.END_TAG
                 break
 
             if h.type == const.RES_XML_CDATA_TYPE:
@@ -356,7 +388,7 @@ class AXMLParser(object):
                 # usually, this typed value is set to UNDEFINED
 
                 # ResStringPool_ref data --> uint32_t index
-                self.m_name, = unpack('<L', self.buff.read(4))
+                self.m_name, = unpack("<L", self.buff.read(4))
 
                 # Res_value typedData:
                 # uint16_t size
@@ -366,7 +398,7 @@ class AXMLParser(object):
                 # For now, we ingore these values
                 size, res0, dataType, data = unpack("<HBBL", self.buff.read(8))
 
-                log.debug(
+                self.log.debug(
                     "found a CDATA Chunk: "
                     "index={: 6d}, size={: 4d}, res0={: 4d}, "
                     "dataType={: 4d}, data={: 4d}".format(
@@ -374,11 +406,13 @@ class AXMLParser(object):
                     )
                 )
 
-                self.m_event = const.TEXT
+                self.event = const.TEXT
                 break
 
             # Still here? Looks like we read an unknown XML header, try to skip it...
-            log.warning("Unknown XML Chunk: 0x{:04x}, skipping {} bytes.".format(h.type, h.size))
+            self.log.warning(
+                "Unknown XML Chunk: 0x{:04x}, skipping {} bytes.".format(h.type, h.size)
+            )
             self.buff.set_idx(h.end)
 
     @property
@@ -386,8 +420,10 @@ class AXMLParser(object):
         """
         Return the String assosciated with the tag name
         """
-        if self.m_name == -1 or (self.m_event != const.START_TAG and self.m_event != const.END_TAG):
-            return u''
+        if self.m_name == -1 or (
+            self.event != const.START_TAG and self.event != const.END_TAG
+        ):
+            return u""
 
         return self.sb[self.m_name]
 
@@ -409,12 +445,14 @@ class AXMLParser(object):
         """
         Return the Namespace URI (if any) as a String for the current tag
         """
-        if self.m_name == -1 or (self.m_event != const.START_TAG and self.m_event != const.END_TAG):
-            return u''
+        if self.m_name == -1 or (
+            self.event != const.START_TAG and self.event != const.END_TAG
+        ):
+            return u""
 
         # No Namespace
         if self.m_namespaceUri == 0xFFFFFFFF:
-            return u''
+            return u""
 
         return self.sb[self.m_namespaceUri]
 
@@ -449,8 +487,8 @@ class AXMLParser(object):
         """
         Return the String assosicated with the current text
         """
-        if self.m_name == -1 or self.m_event != const.TEXT:
-            return u''
+        if self.m_name == -1 or self.event != const.TEXT:
+            return u""
 
         return self.sb[self.m_name]
 
@@ -479,26 +517,26 @@ class AXMLParser(object):
         """
         Return the start inside the m_attributes array for a given attribute
         """
-        if self.m_event != const.START_TAG:
-            log.warning("Current event is not START_TAG.")
+        if self.event != const.START_TAG:
+            self.log.warning("Current event is not START_TAG.")
 
         offset = index * const.ATTRIBUTE_LENGHT
         if offset >= len(self.m_attributes):
-            log.warning("Invalid attribute index")
+            self.log.warning("Invalid attribute index")
 
         return offset
 
-    def getAttributeCount(self):
+    def get_attribute_count(self):
         """
         Return the number of Attributes for a Tag
         or -1 if not in a tag
         """
-        if self.m_event != const.START_TAG:
+        if self.event != const.START_TAG:
             return -1
 
         return self.m_attribute_count
 
-    def getAttributeUri(self, index):
+    def get_attribute_uri(self, index):
         """
         Returns the numeric ID for the namespace URI of an attribute
         """
@@ -507,19 +545,19 @@ class AXMLParser(object):
 
         return uri
 
-    def getAttributeNamespace(self, index):
+    def get_attribute_namespace(self, index):
         """
         Return the Namespace URI (if any) for the attribute
         """
-        uri = self.getAttributeUri(index)
+        uri = self.get_attribute_uri(index)
 
         # No Namespace
         if uri == 0xFFFFFFFF:
-            return u''
+            return u""
 
         return self.sb[uri]
 
-    def getAttributeName(self, index):
+    def get_attribute_name(self, index):
         """
         Returns the String which represents the attribute name
         """
@@ -529,17 +567,19 @@ class AXMLParser(object):
         res = self.sb[name]
         # If the result is a (null) string, we need to look it up.
         if not res:
-            attr = self.m_resourceIDs[name]
-            if attr in public.SYSTEM_RESOURCES['attributes']['inverse']:
-                res = 'android:' + public.SYSTEM_RESOURCES['attributes']['inverse'][attr]
+            attr = self.resource_ids[name]
+            if attr in public.SYSTEM_RESOURCES["attributes"]["inverse"]:
+                res = (
+                    "android:" + public.SYSTEM_RESOURCES["attributes"]["inverse"][attr]
+                )
             else:
                 # Attach the HEX Number, so for multiple missing attributes we do not run
                 # into problems.
-                res = 'android:UNKNOWN_SYSTEM_ATTRIBUTE_{:08x}'.format(attr)
+                res = "android:UNKNOWN_SYSTEM_ATTRIBUTE_{:08x}".format(attr)
 
         return res
 
-    def getAttributeValueType(self, index):
+    def get_attribute_value_type(self, index):
         """
         Return the type of the attribute at the given index
 
@@ -548,7 +588,7 @@ class AXMLParser(object):
         offset = self._get_attribute_offset(index)
         return self.m_attributes[offset + const.ATTRIBUTE_IX_VALUE_TYPE]
 
-    def getAttributeValueData(self, index):
+    def get_attribute_value_data(self, index):
         """
         Return the data of the attribute at the given index
 
@@ -571,4 +611,4 @@ class AXMLParser(object):
         if valueType == const.TYPE_STRING:
             valueString = self.m_attributes[offset + const.ATTRIBUTE_IX_VALUE_STRING]
             return self.sb[valueString]
-        return u''
+        return u""

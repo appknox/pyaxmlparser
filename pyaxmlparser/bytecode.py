@@ -1,23 +1,9 @@
-from __future__ import print_function
-from __future__ import absolute_import
+# -*- coding: utf-8 -*-
 
-from builtins import str
-from builtins import object
 from struct import unpack, pack
-
-import logging
-
-log = logging.getLogger("pyaxmlparser.bytecode")
-
-
-# Handle exit message
-def Exit(msg):
-    log.warning("Error : " + msg)
-    raise Exception("oops")
 
 
 class SV(object):
-
     def __init__(self, size, buff):
         self.__size = size
         self.__value = unpack(self.__size, buff)[0]
@@ -42,7 +28,6 @@ class SV(object):
 
 
 class SVs(object):
-
     def __init__(self, size, ntuple, buff):
         self.__size = size
 
@@ -87,12 +72,6 @@ def object_to_bytes(obj):
         return obj
     else:
         return obj.get_raw()
-
-
-class MethodBC(object):
-
-    def show(self, value):
-        getattr(self, "show_" + value)()
 
 
 class BuffHandle(object):
@@ -179,9 +158,9 @@ class BuffHandle(object):
         Read bytes with length `size` without incrementing the current offset
 
         :param int size: length to read in bytes
-        :rtype: bytearray
+        :rtype: bytearay
         """
-        return self.__buff[self.__idx:self.__idx + size]
+        return self.__buff[self.__idx : self.__idx + size]
 
     def peek(self, size):
         """
@@ -198,7 +177,7 @@ class BuffHandle(object):
         :param int size: length of bytes to read
         :rtype: bytearray
         """
-        return self.__buff[offset:offset + size]
+        return self.__buff[offset : offset + size]
 
     def readat(self, off):
         """
@@ -223,7 +202,7 @@ class BuffHandle(object):
         if isinstance(size, SV):
             size = size.value
 
-        buff = self.__buff[self.__idx:self.__idx + size]
+        buff = self.__buff[self.__idx : self.__idx + size]
         self.__idx += size
 
         return buff
@@ -276,84 +255,84 @@ class Buff(object):
 _Bytecode = BuffHandle
 
 
-def FormatClassToJava(i):
+def format_class_to_java(class_name):
     """
     Transform a java class name into the typed variant found in DEX files.
 
     example::
 
-        >>> FormatClassToJava('java.lang.Object')
+        >>> format_class_to_java('java.lang.Object')
         'Ljava/lang/Object;'
 
-    :param i: the input class name
+    :param class_name: the input class name
     :rtype: str
     """
-    return "L" + i.replace(".", "/") + ";"
+    return "L" + class_name.replace(".", "/") + ";"
 
 
-def FormatClassToPython(i):
+def format_class_to_python(class_name):
     """
     Transform a typed class name into a form which can be used as a python
     attribute
 
     example::
 
-        >>> FormatClassToPython('Lfoo/bar/foo/Barfoo$InnerClass;')
+        >>> format_class_to_python('Lfoo/bar/foo/Barfoo$InnerClass;')
         'Lfoo_bar_foo_Barfoo_InnerClass'
 
-    :param i: classname to transform
+    :param class_name: classname to transform
     :rtype: str
     """
-    i = i[:-1]
-    i = i.replace("/", "_")
-    i = i.replace("$", "_")
+    class_name = class_name[:-1]
+    class_name = class_name.replace("/", "_")
+    class_name = class_name.replace("$", "_")
 
-    return i
+    return class_name
 
 
-def FormatNameToPython(i):
+def format_name_to_python(class_name):
     """
     Transform a (method) name into a form which can be used as a python
     attribute
 
     example::
 
-        >>> FormatNameToPython('<clinit>')
+        >>> format_name_to_python('<clinit>')
         'clinit'
 
-    :param i: name to transform
+    :param class_name: name to transform
     :rtype: str
     """
 
-    i = i.replace("<", "")
-    i = i.replace(">", "")
-    i = i.replace("$", "_")
+    class_name = class_name.replace("<", "")
+    class_name = class_name.replace(">", "")
+    class_name = class_name.replace("$", "_")
 
-    return i
+    return class_name
 
 
-def FormatDescriptorToPython(i):
+def format_descriptor_to_python(class_name):
     """
     Format a descriptor into a form which can be used as a python attribute
 
     example::
 
-        >>> FormatDescriptorToPython('(Ljava/lang/Long; Ljava/lang/Long; Z Z)V')
+        >>> format_descriptor_to_python('(Ljava/lang/Long; Ljava/lang/Long; Z Z)V')
         'Ljava_lang_LongLjava_lang_LongZZV
 
-    :param i: name to transform
+    :param class_name: name to transform
     :rtype: str
     """
 
-    i = i.replace("/", "_")
-    i = i.replace(";", "")
-    i = i.replace("[", "")
-    i = i.replace("(", "")
-    i = i.replace(")", "")
-    i = i.replace(" ", "")
-    i = i.replace("$", "")
+    class_name = class_name.replace("/", "_")
+    class_name = class_name.replace(";", "")
+    class_name = class_name.replace("[", "")
+    class_name = class_name.replace("(", "")
+    class_name = class_name.replace(")", "")
+    class_name = class_name.replace(" ", "")
+    class_name = class_name.replace("$", "")
 
-    return i
+    return class_name
 
 
 class Node(object):

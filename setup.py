@@ -1,49 +1,55 @@
+import os
+import codecs
 from setuptools import find_packages, setup
+import pyaxmlparser
 
-__VERSION__ = '0.3.15'
+here = os.path.abspath(os.path.dirname(__file__))
 
-with open("README.rst", "r") as fh:
-    long_description = fh.read()
+
+with codecs.open(os.path.join(here, "README.rst"), "r", encoding="utf-8") as f:
+    long_description = f.read()
+
 
 setup(
-    name='pyaxmlparser',
-    version=__VERSION__,
-    url='https://github.com/appknox/pyaxmlparser',
-
-    author='Subho Halder',
-    author_email='sunny@appknox.com',
-    license='MIT',
-
-    packages=find_packages(exclude=['tests', 'examples']),
+    name=pyaxmlparser.__package_name__,
+    version=pyaxmlparser.__version__,
+    url=pyaxmlparser.__url__,
+    author=pyaxmlparser.__author__,
+    author_email=pyaxmlparser.__author_email__,
+    license=pyaxmlparser.__license__,
+    packages=find_packages(exclude=["tests", "examples"]),
     include_package_data=True,
     zip_safe=False,
-    platforms='any',
-    install_requires=['lxml', 'click==6.7'],
-    entry_points='''
+    platforms="any",
+    entry_points="""
     [console_scripts]
-    apkinfo = pyaxmlparser.cli:main
-    ''',
-    py_modules=['pyaxmlparser'],
-    description="Python3 Parser for Android XML file and get Application Name without using Androguard",
+    apkinfo = pyaxmlparser.__main__:main
+    pyaxmlparser = pyaxmlparser.__main__:main
+    """,
+    py_modules=["pyaxmlparser"],
+    description=pyaxmlparser.__description__,
     long_description=long_description,
-
-    keywords='appknox axmlparser arscparser android',
+    long_description_content_type="text/markdown",
+    keywords="appknox axmlparser arscparser android",
     classifiers=[
-        'Development Status :: 4 - Beta',
-
-        'Intended Audience :: Developers',
-
-        'License :: OSI Approved :: MIT License',
-
-        'Operating System :: POSIX',
-        'Operating System :: MacOS',
-        'Operating System :: Unix',
-
-        'Programming Language :: Python',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
-
-        'Topic :: Software Development :: Build Tools',
-        'Topic :: Software Development :: Libraries :: Python Modules',
-    ]
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: MacOS :: MacOS X",
+        "Operating System :: POSIX",
+        "Operating System :: POSIX :: BSD",
+        "Operating System :: POSIX :: Linux",
+        "Operating System :: Microsoft :: Windows",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.4",
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: Implementation :: CPython",
+        "Programming Language :: Python :: Implementation :: PyPy"
+        "Topic :: Software Development :: Build Tools",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+    ],
 )

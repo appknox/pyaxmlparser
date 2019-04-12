@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # Type definiton for (type, data) tuples representing a value
 # See http://androidxref.com/9.0.0_r3/xref/frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h#262
 
@@ -35,19 +37,19 @@ TYPE_INT_HEX = 0x11
 # The 'data' is either 0 or 1, for input "false" or "true" respectively.
 TYPE_INT_BOOLEAN = 0x12
 # Beginning of color integer flavors...
-TYPE_FIRST_COLOR_INT = 0x1c
+TYPE_FIRST_COLOR_INT = 0x1C
 # The 'data' is a raw integer value of the form #aarrggbb.
-TYPE_INT_COLOR_ARGB8 = 0x1c
+TYPE_INT_COLOR_ARGB8 = 0x1C
 # The 'data' is a raw integer value of the form #rrggbb.
-TYPE_INT_COLOR_RGB8 = 0x1d
+TYPE_INT_COLOR_RGB8 = 0x1D
 # The 'data' is a raw integer value of the form #argb.
-TYPE_INT_COLOR_ARGB4 = 0x1e
+TYPE_INT_COLOR_ARGB4 = 0x1E
 # The 'data' is a raw integer value of the form #rgb.
-TYPE_INT_COLOR_RGB4 = 0x1f
+TYPE_INT_COLOR_RGB4 = 0x1F
 # ...end of integer flavors.
-TYPE_LAST_COLOR_INT = 0x1f
+TYPE_LAST_COLOR_INT = 0x1F
 # ...end of integer flavors.
-TYPE_LAST_INT = 0x1f
+TYPE_LAST_INT = 0x1F
 
 # Constants for ARSC Files
 # see http://androidxref.com/9.0.0_r3/xref/frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h#215
@@ -62,7 +64,7 @@ RES_XML_END_NAMESPACE_TYPE = 0x0101
 RES_XML_START_ELEMENT_TYPE = 0x0102
 RES_XML_END_ELEMENT_TYPE = 0x0103
 RES_XML_CDATA_TYPE = 0x0104
-RES_XML_LAST_CHUNK_TYPE = 0x017f
+RES_XML_LAST_CHUNK_TYPE = 0x017F
 
 RES_XML_RESOURCE_MAP_TYPE = 0x0180
 
@@ -72,7 +74,6 @@ RES_TABLE_TYPE_SPEC_TYPE = 0x0202
 RES_TABLE_LIBRARY_TYPE = 0x0203
 
 # Flags in the STRING Section
-SORTED_FLAG = 1 << 0
 UTF8_FLAG = 1 << 8
 
 # Position of the fields inside an attribute
@@ -108,7 +109,7 @@ TYPE_TABLE = {
     TYPE_STRING: "string",
 }
 
-RADIX_MULTS = [0.00390625, 3.051758E-005, 1.192093E-007, 4.656613E-010]
+RADIX_MULTS = [0.00390625, 3.051758e-005, 1.192093e-007, 4.656613e-010]
 DIMENSION_UNITS = ["px", "dip", "sp", "pt", "in", "mm"]
 FRACTION_UNITS = ["%", "%p"]
 
@@ -150,10 +151,10 @@ ACONFIGURATION_DENSITY_HIGH = 240
 ACONFIGURATION_DENSITY_XHIGH = 320
 ACONFIGURATION_DENSITY_XXHIGH = 480
 ACONFIGURATION_DENSITY_XXXHIGH = 640
-ACONFIGURATION_DENSITY_ANY = 0xfffe
-ACONFIGURATION_DENSITY_NONE = 0xffff
+ACONFIGURATION_DENSITY_ANY = 0xFFFE
+ACONFIGURATION_DENSITY_NONE = 0xFFFF
 MASK_LAYOUTDIR = 0xC0
-MASK_SCREENSIZE = 0x0f
+MASK_SCREENSIZE = 0x0F
 MASK_SCREENLONG = 0x30
 SHIFT_LAYOUTDIR = 6
 SHIFT_SCREENLONG = 4
