@@ -1309,6 +1309,9 @@ class APK(object):
     @property
     def icon_data(self):
         app_icon_file = self.get_app_icon()
+        if not app_icon_file:
+            return None
+
         app_icon_data = None
         try:
             app_icon_data = self.get_file(app_icon_file)
@@ -1316,7 +1319,7 @@ class APK(object):
             try:
                 app_icon_data = self.get_file(app_icon_file.encode().decode('cp437'))
             except FileNotPresent:
-                pass
+                return None
         return app_icon_data
 
 
