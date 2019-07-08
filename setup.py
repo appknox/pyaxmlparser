@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-__VERSION__ = '0.3.17'
+__VERSION__ = '0.3.18'
 
 with open("README.rst", "r") as fh:
     long_description = fh.read()
