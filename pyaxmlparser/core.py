@@ -224,7 +224,7 @@ class APK(object):
     def _get_res_string_value(self, string):
         if not string.startswith('@string/'):
             return string
-        string_key = string[9:]
+        string_key = string[8:]
 
         res_parser = self.get_android_resources()
         if not res_parser:
