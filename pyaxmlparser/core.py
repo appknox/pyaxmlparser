@@ -9,6 +9,7 @@ from pyaxmlparser.arscparser import ARSCParser
 from pyaxmlparser.axmlprinter import AXMLPrinter
 from pyaxmlparser.axmlparser import AXMLParser
 from pyaxmlparser.arscutil import ARSCResTableConfig
+from pyaxmlparser.resources import public
 import pyaxmlparser.constants as const
 
 import io
@@ -377,6 +378,17 @@ class APK(object):
         if not res_parser:
             # Can not do anything below this point to resolve...
             return None
+
+        if app_icon.startswith("@android:"):
+            android_res_id = app_icon[9:]
+            # default icon:
+                # https://developer.android.com/reference/android/R.mipmap#sym_def_app_icon or
+                # https://developer.android.com/reference/android/R.drawable#sym_def_app_icon
+            if (
+                public.SYSTEM_RESOURCES['mipmaps']['inverse'].get(int(android_res_id, 16)) == 'sym_def_app_icon' or
+                public.SYSTEM_RESOURCES['drawables']['inverse'].get(int(android_res_id, 16)) == 'sym_def_app_icon'
+            ):
+                app_icon = None
 
         if not app_icon:
             res_id = res_parser.get_res_id_by_key(self.package, 'mipmap', 'ic_launcher')
