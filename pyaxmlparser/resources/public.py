@@ -28,6 +28,14 @@ SYSTEM_RESOURCES = {
     "styles": {
         "forward": {k: v for k, v in _public_res['style'].items()},
         "inverse": {v: k for k, v in _public_res['style'].items()}
+    },
+    "drawables": {
+        "forward": {k: v for k, v in _public_res['drawable'].items()},
+        "inverse": {v: k for k, v in _public_res['drawable'].items()}
+    },
+    "mipmaps": {
+        "forward": {k: v for k, v in _public_res['mipmap'].items()},
+        "inverse": {v: k for k, v in _public_res['mipmap'].items()}
     }
 }
 
