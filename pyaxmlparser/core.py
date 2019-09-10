@@ -379,7 +379,7 @@ class APK(object):
             # Can not do anything below this point to resolve...
             return None
 
-        if app_icon.startswith("@android:"):
+        if app_icon and app_icon.startswith("@android:"):
             android_res_id = app_icon[9:]
             # default icon:
                 # https://developer.android.com/reference/android/R.mipmap#sym_def_app_icon or
