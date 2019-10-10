@@ -181,6 +181,8 @@ class AXMLParser(object):
         self._do_next()
         return self.m_event
 
+    next = __next__  # For Python 2 compatibility
+
     def _do_next(self):
         if self.m_event == const.END_DOCUMENT:
             return
