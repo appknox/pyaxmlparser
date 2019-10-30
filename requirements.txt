@@ -1,5 +1,5 @@
 lxml==3.7.3
-click==6.7
+click>=6.7
 
 # testing
 pytest==3.0.6
