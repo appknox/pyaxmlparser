@@ -12,7 +12,7 @@ setup(
 
     author='Subho Halder',
     author_email='sunny@appknox.com',
-    license='MIT',
+    license='Apache License 2.0',
 
     data_files=[('man/man1', ['apkinfo.1'])],
     packages=find_packages(exclude=['tests', 'examples']),
@@ -34,7 +34,7 @@ setup(
 
         'Intended Audience :: Developers',
 
-        'License :: OSI Approved :: MIT License',
+        'License :: OSI Approved :: Apache Software License',
 
         'Operating System :: POSIX',
         'Operating System :: MacOS',
