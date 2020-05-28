@@ -27,6 +27,7 @@ from xml.dom.pulldom import SAX2DOM
 NS_ANDROID_URI = 'http://schemas.android.com/apk/res/android'
 NS_ANDROID = '{{{}}}'.format(NS_ANDROID_URI)  # Namespace as used by etree
 
+logging.basicConfig()
 log = logging.getLogger("pyaxmlparser.core")
 
 
