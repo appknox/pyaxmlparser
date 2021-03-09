@@ -20,6 +20,10 @@ CLI :
     Package: com.hardcodedjoy.roboremo
     Version name: 2.0.0
     Version code: 15
+    Is it Signed: True
+    Is it Signed with v1 Signatures: True
+    Is it Signed with v2 Signatures: True
+    Is it Signed with v3 Signatures: False
 
 
 
