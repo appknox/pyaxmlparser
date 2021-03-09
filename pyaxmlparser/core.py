@@ -2,7 +2,6 @@ from __future__ import division
 from __future__ import print_function
 
 from builtins import str
-from builtins import object
 from struct import unpack
 from pyaxmlparser.utils import read, format_value
 
@@ -1826,7 +1825,7 @@ class APK:
         Return a list of DER coded X.509 public keys from the v3 signature block
         """
 
-        if self._v3_signing_data == None:
+        if self._v3_signing_data is None:
             self.parse_v3_signing_block()
 
         public_keys = []
@@ -1841,7 +1840,7 @@ class APK:
         Return a list of DER coded X.509 public keys from the v3 signature block
         """
 
-        if self._v2_signing_data == None:
+        if self._v2_signing_data is None:
             self.parse_v2_signing_block()
 
         public_keys = []
@@ -1856,7 +1855,7 @@ class APK:
         Return a list of DER coded X.509 certificates from the v3 signature block
         """
 
-        if self._v3_signing_data == None:
+        if self._v3_signing_data is None:
             self.parse_v3_signing_block()
 
         certs = []
@@ -1871,7 +1870,7 @@ class APK:
         Return a list of DER coded X.509 certificates from the v3 signature block
         """
 
-        if self._v2_signing_data == None:
+        if self._v2_signing_data is None:
             self.parse_v2_signing_block()
 
         certs = []
