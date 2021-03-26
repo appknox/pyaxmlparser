@@ -3,7 +3,7 @@ from __future__ import print_function
 
 from builtins import str
 from struct import unpack
-from pyaxmlparser.utils import read, format_value
+from pyaxmlparser.utils import read, format_value, get_certificate_name_string
 
 from pyaxmlparser.arscparser import ARSCParser
 from pyaxmlparser.axmlprinter import AXMLPrinter
@@ -20,9 +20,13 @@ import re
 import zipfile
 import logging
 import hashlib
+import binascii
 
 import lxml.sax
 from xml.dom.pulldom import SAX2DOM
+
+# Used for reading Certificates
+from asn1crypto import cms, x509, keys
 
 
 NS_ANDROID_URI = 'http://schemas.android.com/apk/res/android'
@@ -217,7 +221,7 @@ class APK:
 
     __no_magic = False
 
-    def __init__(self, filename, raw=False, magic_file=None, skip_analysis=False, testzip=False):
+    def __init__(self, filename, raw=False, skip_analysis=False, testzip=False):
         """
         This class can access to all elements in an APK file
 
@@ -234,14 +238,10 @@ class APK:
 
         :type filename: string
         :type raw: boolean
-        :type magic_file: string
         :type skip_analysis: boolean
         :type testzip: boolean
 
         """
-        if magic_file:
-            log.warning("You set magic_file but this parameter is actually unused. You should remove it.")
-
         self.filename = filename
 
         self.xml = {}
@@ -646,6 +646,15 @@ class APK:
             # Magic is optional
             import magic
         except ImportError:
+            self.__no_magic = True
+            log.warning("No Magic library was found on your system.")
+            return default
+        except TypeError as e:
+            self.__no_magic = True
+            log.warning("It looks like you have the magic python package installed but not the magic library itself!")
+            log.warning("Error from magic library: %s", e)
+            log.warning("Please follow the installation instructions at https://github.com/ahupp/python-magic/#installation")
+            log.warning("You can also install the 'python-magic-bin' package on Windows and MacOS")
             return default
 
         try:
