@@ -235,8 +235,8 @@ class AXMLParser(object):
                     "At chunk type 0x{:04x}, declared header size={}, "
                     "chunk size={}".format(h.type, h.header_size, h.size)
                 )
-                self._valid = False
-                return
+                self.buff.seek(h.end)
+                continue
 
             # Line Number of the source file, only used as meta information
             self.m_lineNumber, = unpack('<L', self.buff.read(4))
