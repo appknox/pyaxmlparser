@@ -519,12 +519,9 @@ class APK:
         Return the first icon file name, which density is not greater than max_dpi,
         unless exact icon resolution is set in the manifest, in which case
         return the exact file.
-
         This information is read from the AndroidManifest.xml
-
         From https://developer.android.com/guide/practices/screens_support.html
         and https://developer.android.com/ndk/reference/group___configuration.html
-
         * DEFAULT                             0dpi
         * ldpi (low)                        120dpi
         * mdpi (medium)                     160dpi
@@ -535,7 +532,6 @@ class APK:
         * xxxhdpi (extra-extra-extra-high)  640dpi
         * anydpi                          65534dpi (0xFFFE)
         * nodpi                           65535dpi (0xFFFF)
-
         There is a difference between nodpi and anydpi:
         nodpi will be used if no other density is specified. Or the density does not match.
         nodpi is the fallback for everything else. If there is a resource that matches the DPI,
@@ -543,15 +539,12 @@ class APK:
         anydpi is also valid for all densities but in this case, anydpi will overrule all other files!
         Therefore anydpi is usually used with vector graphics and with constraints on the API level.
         For example adaptive icons are usually marked as anydpi.
-
         When it comes now to selecting an icon, there is the following flow:
-        1) is there an anydpi icon?
-        2) is there an icon for the dpi of the device?
-        3) is there a nodpi icon?
-        4) (only on very old devices) is there a icon with dpi 0 (the default)
-
+        1. is there an anydpi icon?
+        2. is there an icon for the dpi of the device?
+        3. is there a nodpi icon?
+        4. (only on very old devices) is there a icon with dpi 0 (the default)
         For more information read here: https://stackoverflow.com/a/34370735/446140
-
         :rtype: :class:`str`
         """
         main_activity_name = self.get_main_activity()
@@ -566,17 +559,6 @@ class APK:
         if not res_parser:
             # Can not do anything below this point to resolve...
             return None
-
-        if app_icon and app_icon.startswith("@android:"):
-            android_res_id = app_icon[9:]
-            # default icon:
-                # https://developer.android.com/reference/android/R.mipmap#sym_def_app_icon or
-                # https://developer.android.com/reference/android/R.drawable#sym_def_app_icon
-            if (
-                public.SYSTEM_RESOURCES['mipmaps']['inverse'].get(int(android_res_id, 16)) == 'sym_def_app_icon' or
-                public.SYSTEM_RESOURCES['drawables']['inverse'].get(int(android_res_id, 16)) == 'sym_def_app_icon'
-            ):
-                app_icon = None
 
         if not app_icon:
             res_id = res_parser.get_res_id_by_key(self.package, 'mipmap', 'ic_launcher')
@@ -593,7 +575,9 @@ class APK:
             return None
 
         if app_icon.startswith("@"):
-            res_id = int(app_icon[1:], 16)
+            app_icon_id = app_icon[1:]
+            app_icon_id = app_icon_id.split(':')[-1]
+            res_id = int(app_icon_id, 16)
             candidates = res_parser.get_resolved_res_configs(res_id)
 
             app_icon = None
@@ -602,7 +586,7 @@ class APK:
             try:
                 for config, file_name in candidates:
                     dpi = config.get_density()
-                    if current_dpi < dpi <= max_dpi:
+                    if current_dpi < dpi <= max_dpi and not file_name.endswith('.xml'):
                         app_icon = file_name
                         current_dpi = dpi
             except Exception as e:
