@@ -14,7 +14,7 @@ setup(
     author_email='sunny@appknox.com',
     license='Apache License 2.0',
 
-    data_files=[('man/man1', ['apkinfo.1'])],
+    data_files=[('share/man/man1', ['apkinfo.1'])],
     packages=find_packages(exclude=['tests', 'examples']),
     include_package_data=True,
     zip_safe=False,
