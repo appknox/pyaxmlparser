@@ -309,6 +309,14 @@ class APK:
         if not skip_analysis:
             self._apk_analysis()
 
+    def __repr__(self):
+        repr = """
+        filename: {self.filename}
+        package: {self.package}
+        valid apk: {self.valid_apk}
+        """
+        return repr
+
     def _ns(self, name):
         """
         return the name including the Android namespace
