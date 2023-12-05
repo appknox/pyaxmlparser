@@ -8,6 +8,14 @@ A simple parser to parse Android XML file.
 Usage
 ======
 
+.. code-block:: shell
+
+    ➜ apkinfo --help
+    Usage: apkinfo [OPTIONS] FILENAME
+
+    Options:
+    -s, --silent  Don't print any debug or warning logs
+    --help        Show this message and exit.
 
 CLI :
 ====
