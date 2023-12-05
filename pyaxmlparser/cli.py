@@ -23,8 +23,8 @@ import logging
 @click.command()
 @click.argument('filename')
 @click.option('--silent', '-s', default=False, is_flag=True, help="Don't print any debug or warning logs")
-def main(filename, quiet):
-    if quiet:
+def main(filename, silent):
+    if silent:
         logging.basicConfig(level=logging.ERROR)
 
     filename = os.path.expanduser(filename)
