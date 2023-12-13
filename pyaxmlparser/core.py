@@ -794,7 +794,7 @@ class APK:
 
         :rtype: a list of str
         """
-        dexre = re.compile("classes(\d*).dex")
+        dexre = re.compile(r"classes(\d*).dex")
         return filter(lambda x: dexre.match(x), self.get_files())
 
     def get_all_dex(self):
@@ -812,7 +812,7 @@ class APK:
 
         :return: True if multiple dex found, otherwise False
         """
-        dexre = re.compile("^classes(\d+)?.dex$")
+        dexre = re.compile(r"^classes(\d+)?.dex$")
         return len([instance for instance in self.get_files() if dexre.search(instance)]) > 1
 
     @DeprecationWarning
@@ -1011,7 +1011,7 @@ class APK:
         ]
 
     def is_tag_matched(self, tag, **attribute_filter):
-        """
+        r"""
         Return true if the attributes matches in attribute filter.
 
         An attribute filter is a dictionary containing: {attribute_name: value}.
