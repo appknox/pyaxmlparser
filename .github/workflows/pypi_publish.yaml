@@ -1,0 +1,35 @@
+name: Publish Python Package to PyPI
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/pyaxmlparser/
+    permissions:
+      id-token: write
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.8'
+        cache: pip
+    - name: Install Protoc
+      run: |
+        PROTOC_ZIP=protoc-3.13.0-linux-x86_64.zip && \
+        curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/$PROTOC_ZIP && \
+        unzip -q $PROTOC_ZIP bin/protoc -d /usr/local && 
+        protoc --version
+    - name: Install dependencies
+      run: |
+        pip install setuptools wheel build
+    - name: Build
+      run: |
+        python setup.py build && python -m build
+    - name: Publish
+      uses: pypa/gh-action-pypi-publish@release/v1
