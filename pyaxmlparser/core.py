@@ -267,6 +267,7 @@ class APK:
         self.androidversion = {}
         self.permissions = []
         self.uses_permissions = []
+        self.uses_permission_sdk_23 = []
         self.declared_permissions = {}
         self.valid_apk = False
 
@@ -358,10 +359,17 @@ class APK:
                 self.androidversion["Code"] = self.get_attribute_value("manifest", "versionCode")
                 self.androidversion["Name"] = self.get_attribute_value("manifest", "versionName")
                 permission = list(self.get_all_attribute_value("uses-permission", "name"))
+                permission += list(self.get_all_attribute_value("uses-permission-sdk-23", "name"))
                 self.permissions = list(set(self.permissions + permission))
 
                 for uses_permission in self.find_tags("uses-permission"):
                     self.uses_permissions.append([
+                        self.get_value_from_tag(uses_permission, "name"),
+                        self._get_permission_maxsdk(uses_permission)
+                    ])
+
+                for uses_permission in self.find_tags("uses-permission-sdk-23"):
+                    self.uses_permission_sdk_23.append([
                         self.get_value_from_tag(uses_permission, "name"),
                         self._get_permission_maxsdk(uses_permission)
                     ])
@@ -439,7 +447,7 @@ class APK:
         try:
             maxSdkVersion = int(self.get_value_from_tag(item, "maxSdkVersion"))
         except ValueError:
-            log.warning(self.get_max_sdk_version() + 'is not a valid value for <uses-permission> maxSdkVersion')
+            log.warning(f"{self.get_max_sdk_version()} is not a valid value for <{item.tag}> maxSdkVersion")
         except TypeError:
             pass
         return maxSdkVersion
@@ -1206,7 +1214,7 @@ class APK:
         if (WRITE_EXTERNAL_STORAGE in self.permissions or implied_WRITE_EXTERNAL_STORAGE) \
            and READ_EXTERNAL_STORAGE not in self.permissions:
             maxSdkVersion = None
-            for name, version in self.uses_permissions:
+            for name, version in self.uses_permissions + self.uses_permission_sdk_23:
                 if name == WRITE_EXTERNAL_STORAGE:
                     maxSdkVersion = version
                     break
