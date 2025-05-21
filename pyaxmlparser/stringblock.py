@@ -126,7 +126,7 @@ class StringBlock(object):
         if idx in self._cache:
             return self._cache[idx]
 
-        if idx < 0 or not self.m_stringOffsets or idx > self.stringCount:
+        if idx < 0 or not self.m_stringOffsets or idx >= self.stringCount:
             return ""
 
         offset = self.m_stringOffsets[idx]
