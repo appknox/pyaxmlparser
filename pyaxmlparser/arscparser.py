@@ -553,28 +553,31 @@ class ARSCParser(object):
             return result
 
         def _resolve_into_result(self, result, res_id, config):
-            configs = self.resources.get_res_configs(res_id, config)
-            if configs:
-                for config, ate in configs:
-                    self.put_ate_value(result, ate, config)
+            queue = [(res_id, config)]
+            index = 0
 
-        def put_ate_value(self, result, ate, config):
+            while index < len(queue):
+                current_res_id, current_config = queue[index]
+                index += 1
+                configs = self.resources.get_res_configs(current_res_id, current_config)
+                if configs:
+                    for config, ate in configs:
+                        self.put_ate_value(result, ate, config, queue)
+
+        def put_ate_value(self, result, ate, config, queue):
             if ate.is_complex():
                 complex_array = []
                 result.append((config, complex_array))
                 for _, item in ate.item.items:
-                    self.put_item_value(complex_array, item, config, complex_=True)
+                    self.put_item_value(complex_array, item, config, queue, complex_=True)
             else:
-                self.put_item_value(result, ate.key, config, complex_=False)
+                self.put_item_value(result, ate.key, config, queue, complex_=False)
 
-        def put_item_value(self, result, item, config, complex_):
+        def put_item_value(self, result, item, config, queue, complex_):
             if item.is_reference():
                 res_id = item.get_data()
-                if res_id:
-                    self._resolve_into_result(
-                        result,
-                        item.get_data(),
-                        self.wanted_config)
+                if res_id and (res_id, self.wanted_config) not in queue:
+                    queue.append((res_id, self.wanted_config))
             else:
                 if complex_:
                     result.append(item.format_value())
