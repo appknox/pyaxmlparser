@@ -125,16 +125,31 @@ class ARSCParser(object):
 
                         entries = []
                         for i in range(0, a_res_type.entryCount):
-                            current_package.mResId = current_package.mResId & 0xffff0000 | i
-                            entries.append((unpack('<i', self.buff.read(4))[0], current_package.mResId))
+                            if a_res_type.is_sparse():
+                                idx = unpack('<H', self.buff.read(2))[0]
+                                offset = unpack('<H', self.buff.read(2))[0]
+                                offset *= 4
+                            elif a_res_type.is_offset16():
+                                idx = i
+                                offset = unpack('<H', self.buff.read(2))[0]
+                                offset = ARSCResType.NO_ENTRY if offset == 0xFFFF else offset * 4
+                            else:
+                                idx = i
+                                offset = unpack('<I', self.buff.read(4))[0]
+
+                            current_package.mResId = current_package.mResId & 0xffff0000 | idx
+                            entries.append((offset, current_package.mResId))
 
                         self.packages[package_name].append(entries)
 
-                        for entry, res_id in entries:
+                        for offset, res_id in entries:
+                            if offset != ARSCResType.NO_ENTRY:
+                                self.buff.set_idx(pkg_chunk_header.start + a_res_type.entriesStart + offset)
+
                             if self.buff.end():
                                 break
 
-                            if entry != -1:
+                            if offset != ARSCResType.NO_ENTRY:
                                 ate = ARSCResTableEntry(self.buff, res_id, pc)
                                 self.packages[package_name].append(ate)
                                 if ate.is_weak():
@@ -181,13 +196,13 @@ class ARSCParser(object):
                         entries = self.packages[package_name][nb + 2]
                         nb_i = 0
                         for entry, res_id in entries:
-                            if entry != -1:
+                            if entry != ARSCResType.NO_ENTRY:
                                 ate = self.packages[package_name][nb + 3 + nb_i]
 
                                 self.resource_values[ate.mResId][a_res_type.config] = ate
                                 self.resource_keys[package_name][a_res_type.get_type()][ate.get_value()] = ate.mResId
 
-                                if ate.get_index() != -1:
+                                if ate.get_index() != ARSCResType.NO_ENTRY:
                                     c_value["public"].append(
                                         (a_res_type.get_type(), ate.get_value(),
                                          ate.mResId))
@@ -240,7 +255,7 @@ class ARSCParser(object):
         x = [ate.get_value()]
         if ate.key.get_data() == 0:
             x.append("false")
-        elif ate.key.get_data() == -1:
+        elif ate.key.get_data() == 0xFFFFFFFF:
             x.append("true")
         return x
 

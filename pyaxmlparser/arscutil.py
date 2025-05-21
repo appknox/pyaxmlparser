@@ -141,6 +141,10 @@ class ARSCResType(object):
     """
     See http://androidxref.com/9.0.0_r3/xref/frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h#1364
     """
+    FLAG_SPARSE = 1
+    FLAG_OFFSET16 = 2
+    NO_ENTRY = 0xFFFFFFFF
+
     def __init__(self, buff, parent=None):
         self.start = buff.get_idx()
         self.parent = parent
@@ -162,6 +166,12 @@ class ARSCResType(object):
 
     def get_package_name(self):
         return self.parent.get_package_name()
+
+    def is_sparse(self):
+        return bool(self.flags & self.FLAG_SPARSE)
+
+    def is_offset16(self):
+        return bool(self.flags & self.FLAG_OFFSET16)
 
     def __repr__(self):
         return "ARSCResType(%x, %x, %x, %x, %x, %x, %x, %s)" % (
