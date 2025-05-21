@@ -125,21 +125,16 @@ class ARSCResTypeSpec(object):
         self.parent = parent
         self.id = unpack('<B', buff.read(1))[0]
         self.res0 = unpack('<B', buff.read(1))[0]
-        self.res1 = unpack('<H', buff.read(2))[0]
-        res_error = False
         if self.res0 != 0:
             log.warning("res0 is not zero!")
-            res_error = True
+        self.res1 = unpack('<H', buff.read(2))[0]
         if self.res1 != 0:
             log.warning("res1 is not zero!")
-            res_error = True
+        self.entryCount = unpack("<I", buff.read(4))[0]
 
-        if not res_error:  # Skips processing attempt if there was an error
-            self.entryCount = unpack("<I", buff.read(4))[0]
-
-            self.typespec_entries = []
-            for i in range(0, self.entryCount):
-                self.typespec_entries.append(unpack("<I", buff.read(4))[0])
+        self.typespec_entries = []
+        for i in range(0, self.entryCount):
+            self.typespec_entries.append(unpack("<I", buff.read(4))[0])
 
 
 class ARSCResType(object):
@@ -593,9 +588,8 @@ class ARSCResStringPoolRef(object):
         self.res0, = unpack("<B", buff.read(1))
         if self.res0 != 0:
             log.warning("res0 is not zero!")
-        else:
-            self.data_type = unpack('<B', buff.read(1))[0]
-            self.data = unpack('<I', buff.read(4))[0]
+        self.data_type = unpack('<B', buff.read(1))[0]
+        self.data = unpack('<I', buff.read(4))[0]
 
     def get_data_value(self):
         return self.parent.stringpool_main.getString(self.data)
