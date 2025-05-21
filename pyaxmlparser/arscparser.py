@@ -202,7 +202,7 @@ class ARSCParser(object):
                                 self.resource_values[ate.mResId][a_res_type.config] = ate
                                 self.resource_keys[package_name][a_res_type.get_type()][ate.get_value()] = ate.mResId
 
-                                if ate.get_index() != ARSCResType.NO_ENTRY:
+                                if ate.get_key() != ARSCResType.NO_ENTRY:
                                     c_value["public"].append(
                                         (a_res_type.get_type(), ate.get_value(),
                                          ate.mResId))
@@ -241,29 +241,29 @@ class ARSCParser(object):
                 nb += 1
 
     def get_resource_string(self, ate):
-        return [ate.get_value(), ate.get_key_data()]
+        return [ate.get_value(), ate.get_value_data()]
 
     def get_resource_id(self, ate):
         x = [ate.get_value()]
-        if ate.key.get_data() == 0:
+        if ate.value.get_data() == 0:
             x.append("false")
-        elif ate.key.get_data() == 1:
+        elif ate.value.get_data() == 1:
             x.append("true")
         return x
 
     def get_resource_bool(self, ate):
         x = [ate.get_value()]
-        if ate.key.get_data() == 0:
+        if ate.value.get_data() == 0:
             x.append("false")
-        elif ate.key.get_data() == 0xFFFFFFFF:
+        elif ate.value.get_data() == 0xFFFFFFFF:
             x.append("true")
         return x
 
     def get_resource_integer(self, ate):
-        return [ate.get_value(), ate.key.get_data()]
+        return [ate.get_value(), ate.value.get_data()]
 
     def get_resource_color(self, ate):
-        entry_data = ate.key.get_data()
+        entry_data = ate.value.get_data()
         return [
             ate.get_value(),
             "#%02x%02x%02x%02x" % (
@@ -277,14 +277,14 @@ class ARSCParser(object):
         try:
             return [
                 ate.get_value(), "%s%s" % (
-                    complexToFloat(ate.key.get_data()),
-                    const.DIMENSION_UNITS[ate.key.get_data() & const.COMPLEX_UNIT_MASK])
+                    complexToFloat(ate.value.get_data()),
+                    const.DIMENSION_UNITS[ate.value.get_data() & const.COMPLEX_UNIT_MASK])
             ]
         except IndexError:
             log.debug("Out of range dimension unit index for %s: %s" % (
-                complexToFloat(ate.key.get_data()),
-                ate.key.get_data() & const.COMPLEX_UNIT_MASK))
-            return [ate.get_value(), ate.key.get_data()]
+                complexToFloat(ate.value.get_data()),
+                ate.value.get_data() & const.COMPLEX_UNIT_MASK))
+            return [ate.get_value(), ate.value.get_data()]
 
     # FIXME
     def get_resource_style(self, ate):
@@ -586,7 +586,7 @@ class ARSCParser(object):
                 for _, item in ate.item.items:
                     self.put_item_value(complex_array, item, config, queue, complex_=True)
             else:
-                self.put_item_value(result, ate.key, config, queue, complex_=False)
+                self.put_item_value(result, ate.value, config, queue, complex_=False)
 
         def put_item_value(self, result, item, config, queue, complex_):
             if item.is_reference():
