@@ -125,27 +125,26 @@ class ARSCResTypeSpec(object):
         self.parent = parent
         self.id = unpack('<B', buff.read(1))[0]
         self.res0 = unpack('<B', buff.read(1))[0]
-        self.res1 = unpack('<H', buff.read(2))[0]
-        res_error = False
         if self.res0 != 0:
             log.warning("res0 is not zero!")
-            res_error = True
+        self.res1 = unpack('<H', buff.read(2))[0]
         if self.res1 != 0:
             log.warning("res1 is not zero!")
-            res_error = True
+        self.entryCount = unpack("<I", buff.read(4))[0]
 
-        if not res_error:  # Skips processing attempt if there was an error
-            self.entryCount = unpack("<I", buff.read(4))[0]
-
-            self.typespec_entries = []
-            for i in range(0, self.entryCount):
-                self.typespec_entries.append(unpack("<I", buff.read(4))[0])
+        self.typespec_entries = []
+        for i in range(0, self.entryCount):
+            self.typespec_entries.append(unpack("<I", buff.read(4))[0])
 
 
 class ARSCResType(object):
     """
     See http://androidxref.com/9.0.0_r3/xref/frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h#1364
     """
+    FLAG_SPARSE = 1
+    FLAG_OFFSET16 = 2
+    NO_ENTRY = 0xFFFFFFFF
+
     def __init__(self, buff, parent=None):
         self.start = buff.get_idx()
         self.parent = parent
@@ -167,6 +166,12 @@ class ARSCResType(object):
 
     def get_package_name(self):
         return self.parent.get_package_name()
+
+    def is_sparse(self):
+        return bool(self.flags & self.FLAG_SPARSE)
+
+    def is_offset16(self):
+        return bool(self.flags & self.FLAG_OFFSET16)
 
     def __repr__(self):
         return "ARSCResType(%x, %x, %x, %x, %x, %x, %x, %s)" % (
@@ -521,6 +526,7 @@ class ARSCResTableEntry(object):
     FLAG_COMPLEX = 1
     FLAG_PUBLIC = 2
     FLAG_WEAK = 4
+    FLAG_COMPACT = 8
 
     def __init__(self, buff, mResId, parent=None):
         self.start = buff.get_idx()
@@ -528,22 +534,27 @@ class ARSCResTableEntry(object):
         self.parent = parent
         self.size = unpack('<H', buff.read(2))[0]
         self.flags = unpack('<H', buff.read(2))[0]
-        self.index = unpack('<I', buff.read(4))[0]
+        self.key = unpack('<I', buff.read(4))[0]
 
-        if self.is_complex():
+        if self.is_compact():
+            self.compact_key = unpack('<H', buff.read(2))[0]
+            self.compact_flags = unpack('<H', buff.read(2))[0]
+            self.compact_data = unpack('<I', buff.read(4))[0]
+            self.value = ARSCResValue(data=self.compact_data, data_type=self.compact_flags >> 8, parent=parent)
+        elif self.is_complex():
             self.item = ARSCComplex(buff, parent)
         else:
             # If FLAG_COMPLEX is not set, a Res_value structure will follow
-            self.key = ARSCResStringPoolRef(buff, self.parent)
+            self.value = ARSCResValue.fetch(buff, parent)
 
-    def get_index(self):
-        return self.index
+    def get_key(self):
+        return self.compact_key if self.is_compact() else self.key
 
     def get_value(self):
-        return self.parent.mKeyStrings.getString(self.index)
+        return self.parent.mKeyStrings.getString(self.key)
 
-    def get_key_data(self):
-        return self.key.get_data_value()
+    def get_value_data(self):
+        return self.value.get_data_value()
 
     def is_public(self):
         return (self.flags & self.FLAG_PUBLIC) != 0
@@ -554,16 +565,19 @@ class ARSCResTableEntry(object):
     def is_weak(self):
         return (self.flags & self.FLAG_WEAK) != 0
 
+    def is_compact(self):
+        return (self.flags & self.FLAG_COMPACT) != 0
+
     def __repr__(self):
         return (
             "<ARSCResTableEntry idx='0x{:08x}' mResId='0x{:08x}' size='{}' "
-            "flags='0x{:02x}' index='0x{:x}' holding={}>"
+            "flags='0x{:02x}' key='0x{:x}' holding={}>"
         ).format(
             self.start,
             self.mResId,
             self.size,
             self.flags,
-            self.index,
+            self.key,
             self.item if self.is_complex() else self.key)
 
 
@@ -577,25 +591,35 @@ class ARSCComplex(object):
 
         self.items = []
         for i in range(0, self.count):
-            self.items.append((unpack('<I', buff.read(4))[0],
-                               ARSCResStringPoolRef(buff, self.parent)))
+            name = unpack('<I', buff.read(4))[0]
+            value = ARSCResValue.fetch(buff, parent)
+            self.items.append((name, value))
 
     def __repr__(self):
         return "<ARSCComplex idx='0x{:08x}' parent='{}' count='{}'>".format(self.start, self.id_parent, self.count)
 
-
-class ARSCResStringPoolRef(object):
-    def __init__(self, buff, parent=None):
-        self.start = buff.get_idx()
+class ARSCResValue:
+    def __init__(self, data, data_type, res0=0, size=8, parent=None):
+        self.size = size
+        self.res0 = res0
+        self.data = data
+        self.data_type = data_type
         self.parent = parent
 
-        self.size, = unpack("<H", buff.read(2))
-        self.res0, = unpack("<B", buff.read(1))
-        if self.res0 != 0:
+    @classmethod
+    def fetch(cls, buff, parent=None):
+        start = buff.get_idx()
+
+        size, = unpack("<H", buff.read(2))
+        res0, = unpack("<B", buff.read(1))
+        if res0 != 0:
             log.warning("res0 is not zero!")
-        else:
-            self.data_type = unpack('<B', buff.read(1))[0]
-            self.data = unpack('<I', buff.read(4))[0]
+
+        data_type = unpack('<B', buff.read(1))[0]
+        data = unpack('<I', buff.read(4))[0]
+
+        buff.set_idx(start + size)
+        return ARSCResValue(size=size, res0=res0, data=data, data_type=data_type, parent=parent)
 
     def get_data_value(self):
         return self.parent.stringpool_main.getString(self.data)
@@ -620,8 +644,7 @@ class ARSCResStringPoolRef(object):
         return self.data_type == const.TYPE_REFERENCE
 
     def __repr__(self):
-        return "<ARSCResStringPoolRef idx='0x{:08x}' size='{}' type='{}' data='0x{:08x}'>".format(
-            self.start,
+        return "<ARSCResValue size='{}' type='{}' data='0x{:08x}'>".format(
             self.size,
             const.TYPE_TABLE.get(self.data_type, "0x%x" % self.data_type),
             self.data)

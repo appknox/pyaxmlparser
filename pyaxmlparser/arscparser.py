@@ -125,16 +125,31 @@ class ARSCParser(object):
 
                         entries = []
                         for i in range(0, a_res_type.entryCount):
-                            current_package.mResId = current_package.mResId & 0xffff0000 | i
-                            entries.append((unpack('<i', self.buff.read(4))[0], current_package.mResId))
+                            if a_res_type.is_sparse():
+                                idx = unpack('<H', self.buff.read(2))[0]
+                                offset = unpack('<H', self.buff.read(2))[0]
+                                offset *= 4
+                            elif a_res_type.is_offset16():
+                                idx = i
+                                offset = unpack('<H', self.buff.read(2))[0]
+                                offset = ARSCResType.NO_ENTRY if offset == 0xFFFF else offset * 4
+                            else:
+                                idx = i
+                                offset = unpack('<I', self.buff.read(4))[0]
+
+                            current_package.mResId = current_package.mResId & 0xffff0000 | idx
+                            entries.append((offset, current_package.mResId))
 
                         self.packages[package_name].append(entries)
 
-                        for entry, res_id in entries:
+                        for offset, res_id in entries:
+                            if offset != ARSCResType.NO_ENTRY:
+                                self.buff.set_idx(pkg_chunk_header.start + a_res_type.entriesStart + offset)
+
                             if self.buff.end():
                                 break
 
-                            if entry != -1:
+                            if offset != ARSCResType.NO_ENTRY:
                                 ate = ARSCResTableEntry(self.buff, res_id, pc)
                                 self.packages[package_name].append(ate)
                                 if ate.is_weak():
@@ -181,13 +196,13 @@ class ARSCParser(object):
                         entries = self.packages[package_name][nb + 2]
                         nb_i = 0
                         for entry, res_id in entries:
-                            if entry != -1:
+                            if entry != ARSCResType.NO_ENTRY:
                                 ate = self.packages[package_name][nb + 3 + nb_i]
 
                                 self.resource_values[ate.mResId][a_res_type.config] = ate
                                 self.resource_keys[package_name][a_res_type.get_type()][ate.get_value()] = ate.mResId
 
-                                if ate.get_index() != -1:
+                                if ate.get_key() != ARSCResType.NO_ENTRY:
                                     c_value["public"].append(
                                         (a_res_type.get_type(), ate.get_value(),
                                          ate.mResId))
@@ -226,29 +241,29 @@ class ARSCParser(object):
                 nb += 1
 
     def get_resource_string(self, ate):
-        return [ate.get_value(), ate.get_key_data()]
+        return [ate.get_value(), ate.get_value_data()]
 
     def get_resource_id(self, ate):
         x = [ate.get_value()]
-        if ate.key.get_data() == 0:
+        if ate.value.get_data() == 0:
             x.append("false")
-        elif ate.key.get_data() == 1:
+        elif ate.value.get_data() == 1:
             x.append("true")
         return x
 
     def get_resource_bool(self, ate):
         x = [ate.get_value()]
-        if ate.key.get_data() == 0:
+        if ate.value.get_data() == 0:
             x.append("false")
-        elif ate.key.get_data() == -1:
+        elif ate.value.get_data() == 0xFFFFFFFF:
             x.append("true")
         return x
 
     def get_resource_integer(self, ate):
-        return [ate.get_value(), ate.key.get_data()]
+        return [ate.get_value(), ate.value.get_data()]
 
     def get_resource_color(self, ate):
-        entry_data = ate.key.get_data()
+        entry_data = ate.value.get_data()
         return [
             ate.get_value(),
             "#%02x%02x%02x%02x" % (
@@ -262,14 +277,14 @@ class ARSCParser(object):
         try:
             return [
                 ate.get_value(), "%s%s" % (
-                    complexToFloat(ate.key.get_data()),
-                    const.DIMENSION_UNITS[ate.key.get_data() & const.COMPLEX_UNIT_MASK])
+                    complexToFloat(ate.value.get_data()),
+                    const.DIMENSION_UNITS[ate.value.get_data() & const.COMPLEX_UNIT_MASK])
             ]
         except IndexError:
             log.debug("Out of range dimension unit index for %s: %s" % (
-                complexToFloat(ate.key.get_data()),
-                ate.key.get_data() & const.COMPLEX_UNIT_MASK))
-            return [ate.get_value(), ate.key.get_data()]
+                complexToFloat(ate.value.get_data()),
+                ate.value.get_data() & const.COMPLEX_UNIT_MASK))
+            return [ate.get_value(), ate.value.get_data()]
 
     # FIXME
     def get_resource_style(self, ate):
@@ -553,28 +568,31 @@ class ARSCParser(object):
             return result
 
         def _resolve_into_result(self, result, res_id, config):
-            configs = self.resources.get_res_configs(res_id, config)
-            if configs:
-                for config, ate in configs:
-                    self.put_ate_value(result, ate, config)
+            queue = [(res_id, config)]
+            index = 0
 
-        def put_ate_value(self, result, ate, config):
+            while index < len(queue):
+                current_res_id, current_config = queue[index]
+                index += 1
+                configs = self.resources.get_res_configs(current_res_id, current_config)
+                if configs:
+                    for config, ate in configs:
+                        self.put_ate_value(result, ate, config, queue)
+
+        def put_ate_value(self, result, ate, config, queue):
             if ate.is_complex():
                 complex_array = []
                 result.append((config, complex_array))
                 for _, item in ate.item.items:
-                    self.put_item_value(complex_array, item, config, complex_=True)
+                    self.put_item_value(complex_array, item, config, queue, complex_=True)
             else:
-                self.put_item_value(result, ate.key, config, complex_=False)
+                self.put_item_value(result, ate.value, config, queue, complex_=False)
 
-        def put_item_value(self, result, item, config, complex_):
+        def put_item_value(self, result, item, config, queue, complex_):
             if item.is_reference():
                 res_id = item.get_data()
-                if res_id:
-                    self._resolve_into_result(
-                        result,
-                        item.get_data(),
-                        self.wanted_config)
+                if res_id and (res_id, self.wanted_config) not in queue:
+                    queue.append((res_id, self.wanted_config))
             else:
                 if complex_:
                     result.append(item.format_value())
