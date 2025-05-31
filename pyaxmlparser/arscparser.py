@@ -25,6 +25,7 @@ from pyaxmlparser.stringblock import StringBlock
 import pyaxmlparser.constants as const
 from pyaxmlparser.utils import complexToFloat
 from xml.sax.saxutils import escape
+from pyaxmlparser.exceptions import ResParserError
 
 log = logging.getLogger("pyaxmlparser.arscparser")
 
@@ -135,17 +136,21 @@ class ARSCParser(object):
                                 break
 
                             if entry != -1:
-                                ate = ARSCResTableEntry(self.buff, res_id, pc)
-                                self.packages[package_name].append(ate)
-                                if ate.is_weak():
-                                    # FIXME we are not sure how to implement the FLAG_WEAk!
-                                    # We saw the following: There is just a single Res_value after the ARSCResTableEntry
-                                    # and then comes the next ARSCHeader.
-                                    # Therefore we think this means all entries are somehow replicated?
-                                    # So we do some kind of hack here. We set the idx to the entry again...
-                                    # Now we will read all entries!
-                                    # Not sure if this is a good solution though
-                                    self.buff.set_idx(ate.start)
+                                try:
+                                    ate = ARSCResTableEntry(self.buff, res_id, pc)
+                                    self.packages[package_name].append(ate)
+                                    if ate.is_weak():
+                                        # FIXME we are not sure how to implement the FLAG_WEAk!
+                                        # We saw the following: There is just a single Res_value after the ARSCResTableEntry
+                                        # and then comes the next ARSCHeader.
+                                        # Therefore we think this means all entries are somehow replicated?
+                                        # So we do some kind of hack here. We set the idx to the entry again...
+                                        # Now we will read all entries!
+                                        # Not sure if this is a good solution though
+                                        self.buff.set_idx(ate.start)
+                                except ResParserError as e:
+                                    log.warning("Skipping corrupted ARSC entry at res_id %x: %s", res_id, e)
+                                    continue
                     elif pkg_chunk_header.type == const.RES_TABLE_LIBRARY_TYPE:
                         log.warning("RES_TABLE_LIBRARY_TYPE chunk is not supported")
                     else:

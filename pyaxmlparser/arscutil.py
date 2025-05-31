@@ -19,6 +19,7 @@ import logging
 from struct import unpack
 import pyaxmlparser.constants as const
 from pyaxmlparser.utils import format_value
+from pyaxmlparser.exceptions import ResParserError
 
 log = logging.getLogger("pyaxmlparser.arscutil")
 
@@ -123,18 +124,23 @@ class ARSCResTypeSpec(object):
     def __init__(self, buff, parent=None):
         self.start = buff.get_idx()
         self.parent = parent
-        self.id = unpack('<B', buff.read(1))[0]
-        self.res0 = unpack('<B', buff.read(1))[0]
-        if self.res0 != 0:
-            log.warning("res0 is not zero!")
-        self.res1 = unpack('<H', buff.read(2))[0]
-        if self.res1 != 0:
-            log.warning("res1 is not zero!")
-        self.entryCount = unpack("<I", buff.read(4))[0]
+        
+        try:
+            self.id = unpack('<B', buff.read(1))[0]
+            self.res0 = unpack('<B', buff.read(1))[0]
+            if self.res0 != 0:
+                log.warning("res0 is not zero!")
+            self.res1 = unpack('<H', buff.read(2))[0]
+            if self.res1 != 0:
+                log.warning("res1 is not zero!")
+            self.entryCount = unpack("<I", buff.read(4))[0]
 
-        self.typespec_entries = []
-        for i in range(0, self.entryCount):
-            self.typespec_entries.append(unpack("<I", buff.read(4))[0])
+            self.typespec_entries = []
+            for i in range(0, self.entryCount):
+                self.typespec_entries.append(unpack("<I", buff.read(4))[0])
+        except Exception as e:
+            log.error("Failed to parse ARSCResTypeSpec at offset %d: %s", self.start, e)
+            raise ResParserError(f"Buffer validation failed in ARSCResTypeSpec at offset {self.start}") from e
 
 
 class ARSCResType(object):
@@ -521,15 +527,20 @@ class ARSCResTableEntry(object):
         self.start = buff.get_idx()
         self.mResId = mResId
         self.parent = parent
-        self.size = unpack('<H', buff.read(2))[0]
-        self.flags = unpack('<H', buff.read(2))[0]
-        self.index = unpack('<I', buff.read(4))[0]
+        
+        try:
+            self.size = unpack('<H', buff.read(2))[0]
+            self.flags = unpack('<H', buff.read(2))[0]
+            self.index = unpack('<I', buff.read(4))[0]
 
-        if self.is_complex():
-            self.item = ARSCComplex(buff, parent)
-        else:
-            # If FLAG_COMPLEX is not set, a Res_value structure will follow
-            self.key = ARSCResStringPoolRef(buff, self.parent)
+            if self.is_complex():
+                self.item = ARSCComplex(buff, parent)
+            else:
+                # If FLAG_COMPLEX is not set, a Res_value structure will follow
+                self.key = ARSCResStringPoolRef(buff, self.parent)
+        except Exception as e:
+            log.error("Failed to parse ARSCResTableEntry at offset %d: %s", self.start, e)
+            raise ResParserError(f"Buffer validation failed in ARSCResTableEntry at offset {self.start}") from e
 
     def get_index(self):
         return self.index
@@ -567,13 +578,17 @@ class ARSCComplex(object):
         self.start = buff.get_idx()
         self.parent = parent
 
-        self.id_parent = unpack('<I', buff.read(4))[0]
-        self.count = unpack('<I', buff.read(4))[0]
+        try:
+            self.id_parent = unpack('<I', buff.read(4))[0]
+            self.count = unpack('<I', buff.read(4))[0]
 
-        self.items = []
-        for i in range(0, self.count):
-            self.items.append((unpack('<I', buff.read(4))[0],
-                               ARSCResStringPoolRef(buff, self.parent)))
+            self.items = []
+            for i in range(0, self.count):
+                self.items.append((unpack('<I', buff.read(4))[0],
+                                   ARSCResStringPoolRef(buff, self.parent)))
+        except Exception as e:
+            log.error("Failed to parse ARSCComplex at offset %d: %s", self.start, e)
+            raise ResParserError(f"Buffer validation failed in ARSCComplex at offset {self.start}") from e
 
     def __repr__(self):
         return "<ARSCComplex idx='0x{:08x}' parent='{}' count='{}'>".format(self.start, self.id_parent, self.count)
@@ -584,12 +599,16 @@ class ARSCResStringPoolRef(object):
         self.start = buff.get_idx()
         self.parent = parent
 
-        self.size, = unpack("<H", buff.read(2))
-        self.res0, = unpack("<B", buff.read(1))
-        if self.res0 != 0:
-            log.warning("res0 is not zero!")
-        self.data_type = unpack('<B', buff.read(1))[0]
-        self.data = unpack('<I', buff.read(4))[0]
+        try:
+            self.size, = unpack("<H", buff.read(2))
+            self.res0, = unpack("<B", buff.read(1))
+            if self.res0 != 0:
+                log.warning("res0 is not zero!")
+            self.data_type = unpack('<B', buff.read(1))[0]
+            self.data = unpack('<I', buff.read(4))[0]
+        except Exception as e:
+            log.error("Failed to parse ARSCResStringPoolRef at offset %d: %s", self.start, e)
+            raise ResParserError(f"Buffer validation failed in ARSCResStringPoolRef at offset {self.start}") from e
 
     def get_data_value(self):
         return self.parent.stringpool_main.getString(self.data)
