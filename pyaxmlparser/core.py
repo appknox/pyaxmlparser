@@ -1489,8 +1489,12 @@ class APK:
                 # There is a rare case, that no resource file is supplied.
                 # Maybe it was added manually, thus we check here
                 return None
-            self.arsc["resources.arsc"] = ARSCParser(self.zip.read("resources.arsc"))
-            return self.arsc["resources.arsc"]
+            try:
+                self.arsc["resources.arsc"] = ARSCParser(self.zip.read("resources.arsc"))
+                return self.arsc["resources.arsc"]
+            except Exception as e:
+                log.warning("Failed to parse resources.arsc, continuing with limited functionality: %s", e)
+                return None
 
     def get_certificate_der(self, filename):
         """
