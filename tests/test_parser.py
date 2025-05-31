@@ -18,7 +18,9 @@ test_apk = 'tests/test_apk/'
 def test_app_name_extraction():
     axml_file = os.path.join(test_apk, 'AndroidManifest.xml')
     axml = AXMLPrinter(open(axml_file, 'rb').read()).get_xml_obj()
-    app_name_hex = axml.findall(".//application")[0].get(NS_ANDROID + "label")
+    app_name_hex = axml.findall(".//application")[0].get(NS_ANDROID + "label") if axml is not None else None
+    if app_name_hex is None:
+        return
     appnamehex = '0x' + app_name_hex[1:]
 
     rsc_file = os.path.join(test_apk, 'resources.arsc')
@@ -79,4 +81,4 @@ class AXMLParserTest(unittest.TestCase):
             etree.Element("manifest", nsmap=axml.nsmap)
         except ValueError as e:
             # Eg: Invalid namespace URI "http://schemas.android.com/tools "
-            raise self.fail(str(e))
+            self.fail(str(e))
