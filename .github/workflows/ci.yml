@@ -26,7 +26,13 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest coverage flake8 ruff codecov
+        pip install pytest coverage ruff codecov
+        # Install compatible flake8 version for older Python versions
+        if [[ "${{ matrix.python-version }}" == "3.8" ]]; then
+          pip install "flake8<6.0.0" "pyflakes<3.0.0"
+        else
+          pip install flake8
+        fi
     
     - name: Lint with flake8
       run: |
