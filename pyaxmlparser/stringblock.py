@@ -19,6 +19,7 @@ import logging
 from struct import unpack
 
 import pyaxmlparser.constants as const
+from pyaxmlparser.exceptions import InvalidStringPoolError, BufferUnderrunError
 
 
 log = logging.getLogger("pyaxmlparser.stringblock")
@@ -68,11 +69,15 @@ class StringBlock(object):
         # Next, there is a list of string following.
         # This is only a list of offsets (4 byte each)
         for i in range(self.stringCount):
+            if buff.size() - buff.get_idx() < 4:
+                raise BufferUnderrunError(f"Insufficient buffer for string offset {i}")
             self.m_stringOffsets.append(unpack('<I', buff.read(4))[0])
 
         # And a list of styles
         # again, a list of offsets
         for i in range(self.styleCount):
+            if buff.size() - buff.get_idx() < 4:
+                raise BufferUnderrunError(f"Insufficient buffer for style offset {i}")
             self.m_styleOffsets.append(unpack('<I', buff.read(4))[0])
 
         # FIXME it is probably better to parse n strings and not calculate the size
@@ -129,12 +134,16 @@ class StringBlock(object):
         if idx < 0 or not self.m_stringOffsets or idx >= self.stringCount:
             return ""
 
-        offset = self.m_stringOffsets[idx]
+        try:
+            offset = self.m_stringOffsets[idx]
 
-        if self.m_isUTF8:
-            self._cache[idx] = self._decode8(offset)
-        else:
-            self._cache[idx] = self._decode16(offset)
+            if self.m_isUTF8:
+                self._cache[idx] = self._decode8(offset)
+            else:
+                self._cache[idx] = self._decode16(offset)
+        except (BufferUnderrunError, InvalidStringPoolError) as e:
+            log.warning(f"Failed to decode string at index {idx}: {e}")
+            self._cache[idx] = f"<invalid_string_{idx}>"
 
         return self._cache[idx]
 
@@ -156,6 +165,9 @@ class StringBlock(object):
         """
         # UTF-8 Strings contain two lengths, as they might differ:
         # 1) the UTF-16 length
+        if offset >= len(self.m_charbuff):
+            raise BufferUnderrunError(f"String offset {offset} beyond buffer size {len(self.m_charbuff)}")
+            
         str_len, skip = self._decode_length(offset, 1)
         offset += skip
 
@@ -163,10 +175,13 @@ class StringBlock(object):
         encoded_bytes, skip = self._decode_length(offset, 1)
         offset += skip
 
+        if offset + encoded_bytes >= len(self.m_charbuff):
+            raise BufferUnderrunError(f"String data extends beyond buffer: need {encoded_bytes} bytes at offset {offset}")
+
         data = self.m_charbuff[offset: offset + encoded_bytes]
 
-        assert self.m_charbuff[offset + encoded_bytes] == 0, \
-            "UTF-8 String is not null terminated! At offset={}".format(offset)
+        if offset + encoded_bytes < len(self.m_charbuff) and self.m_charbuff[offset + encoded_bytes] != 0:
+            log.warning("UTF-8 String is not null terminated at offset={}".format(offset))
 
         return self._decode_bytes(data, 'utf-8', str_len)
 
@@ -177,16 +192,22 @@ class StringBlock(object):
         :param offset: offset of the string inside the data
         :return: str
         """
+        if offset >= len(self.m_charbuff):
+            raise BufferUnderrunError(f"String offset {offset} beyond buffer size {len(self.m_charbuff)}")
+            
         str_len, skip = self._decode_length(offset, 2)
         offset += skip
 
         # The len is the string len in utf-16 units
         encoded_bytes = str_len * 2
 
+        if offset + encoded_bytes > len(self.m_charbuff):
+            raise BufferUnderrunError(f"String data extends beyond buffer: need {encoded_bytes} bytes at offset {offset}")
+
         data = self.m_charbuff[offset: offset + encoded_bytes]
 
-        assert self.m_charbuff[offset + encoded_bytes:offset + encoded_bytes + 2] == b"\x00\x00", \
-            "UTF-16 String is not null terminated! At offset={}".format(offset)
+        if offset + encoded_bytes + 1 < len(self.m_charbuff) and self.m_charbuff[offset + encoded_bytes:offset + encoded_bytes + 2] != b"\x00\x00":
+            log.warning("UTF-16 String is not null terminated at offset={}".format(offset))
 
         return self._decode_bytes(data, 'utf-16', str_len)
 
@@ -228,6 +249,9 @@ class StringBlock(object):
         fmt = "<2{}".format('B' if sizeof_char == 1 else 'H')
         highbit = 0x80 << (8 * (sizeof_char - 1))
 
+        if offset + sizeof_2chars > len(self.m_charbuff):
+            raise BufferUnderrunError(f"Insufficient buffer for length decoding at offset {offset}")
+            
         length1, length2 = unpack(fmt, self.m_charbuff[offset:(offset + sizeof_2chars)])
 
         if (length1 & highbit) != 0:
@@ -238,9 +262,11 @@ class StringBlock(object):
             size = sizeof_char
 
         if sizeof_char == 1:
-            assert length <= 0x7FFF, "length of UTF-8 string is too large! At offset={}".format(offset)
+            if length > 0x7FFF:
+                raise InvalidStringPoolError(f"length of UTF-8 string is too large! At offset={offset}")
         else:
-            assert length <= 0x7FFFFFFF, "length of UTF-16 string is too large!  At offset={}".format(offset)
+            if length > 0x7FFFFFFF:
+                raise InvalidStringPoolError(f"length of UTF-16 string is too large! At offset={offset}")
 
         return length, size
 

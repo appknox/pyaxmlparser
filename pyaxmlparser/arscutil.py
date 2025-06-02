@@ -19,6 +19,7 @@ import logging
 from struct import unpack
 import pyaxmlparser.constants as const
 from pyaxmlparser.utils import format_value
+from pyaxmlparser.exceptions import ResParserError, BufferUnderrunError
 
 log = logging.getLogger("pyaxmlparser.arscutil")
 
@@ -567,13 +568,25 @@ class ARSCComplex(object):
         self.start = buff.get_idx()
         self.parent = parent
 
+        if buff.size() - buff.get_idx() < 8:
+            raise BufferUnderrunError(f"Insufficient buffer for ARSCComplex header: need 8 bytes, have {buff.size() - buff.get_idx()}")
+
         self.id_parent = unpack('<I', buff.read(4))[0]
         self.count = unpack('<I', buff.read(4))[0]
 
         self.items = []
         for i in range(0, self.count):
-            self.items.append((unpack('<I', buff.read(4))[0],
-                               ARSCResStringPoolRef(buff, self.parent)))
+            if buff.size() - buff.get_idx() < 4:
+                log.warning(f"Insufficient buffer for ARSCComplex item {i}: need 4 bytes, have {buff.size() - buff.get_idx()}")
+                break
+            
+            item_id = unpack('<I', buff.read(4))[0]
+            try:
+                ref = ARSCResStringPoolRef(buff, self.parent)
+                self.items.append((item_id, ref))
+            except BufferUnderrunError as e:
+                log.warning(f"Failed to read ARSCResStringPoolRef for item {i}: {e}")
+                break
 
     def __repr__(self):
         return "<ARSCComplex idx='0x{:08x}' parent='{}' count='{}'>".format(self.start, self.id_parent, self.count)
@@ -584,6 +597,9 @@ class ARSCResStringPoolRef(object):
         self.start = buff.get_idx()
         self.parent = parent
 
+        if buff.size() - buff.get_idx() < 8:
+            raise BufferUnderrunError(f"Insufficient buffer for ARSCResStringPoolRef: need 8 bytes, have {buff.size() - buff.get_idx()}")
+        
         self.size, = unpack("<H", buff.read(2))
         self.res0, = unpack("<B", buff.read(1))
         if self.res0 != 0:
