@@ -1,6 +1,18 @@
 axmlparser
 ===========
 
+.. image:: https://github.com/appknox/pyaxmlparser/workflows/CI/badge.svg
+   :target: https://github.com/appknox/pyaxmlparser/actions/workflows/ci.yml
+   :alt: CI Status
+
+.. image:: https://github.com/appknox/pyaxmlparser/workflows/CodeQL/badge.svg
+   :target: https://github.com/appknox/pyaxmlparser/actions/workflows/codeql.yml
+   :alt: CodeQL
+
+.. image:: https://codecov.io/gh/appknox/pyaxmlparser/branch/master/graph/badge.svg
+   :target: https://codecov.io/gh/appknox/pyaxmlparser
+   :alt: Coverage
+
 
 A simple parser to parse Android XML file.
 
