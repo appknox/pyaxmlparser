@@ -3,6 +3,6 @@ click>=6.7
 asn1crypto>=0.24.0
 
 # testing
-pytest==3.0.6
+pytest>=6.0.0
 flake8==3.3.0
-coverage==4.4.1
+coverage>=5.0.0
