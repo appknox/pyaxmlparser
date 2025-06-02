@@ -24,7 +24,7 @@ from pyaxmlparser.arscparser import ARSCParser
 from pyaxmlparser.axmlprinter import AXMLPrinter
 from pyaxmlparser.axmlparser import AXMLParser
 from pyaxmlparser.arscutil import ARSCResTableConfig
-from pyaxmlparser.resources import public
+
 import pyaxmlparser.constants as const
 
 
@@ -683,7 +683,7 @@ class APK:
 
         try:
             ftype = magic.from_buffer(buffer[:1024])
-        except magic.MagicError as e:
+        except magic.MagicError:
             log.exception("Error getting the magic type!")
             return default
 
@@ -1236,17 +1236,17 @@ class APK:
 
         :rtype: dict of {permission: [protectionLevel, label, description]}
         """
-        l = {}
+        permissions_dict = {}
 
         for i in self.permissions:
             if i in self.permission_module:
                 x = self.permission_module[i]
-                l[i] = [x["protectionLevel"], x["label"], x["description"]]
+                permissions_dict[i] = [x["protectionLevel"], x["label"], x["description"]]
             else:
                 # FIXME: the permission might be signature, if it is defined by the app itself!
-                l[i] = ["normal", "Unknown permission from android reference",
+                permissions_dict[i] = ["normal", "Unknown permission from android reference",
                         "Unknown permission from android reference"]
-        return l
+        return permissions_dict
 
     @DeprecationWarning
     def get_requested_permissions(self):
@@ -1280,14 +1280,14 @@ class APK:
 
         :rtype: dictionary
         """
-        l = {}
+        aosp_permissions = {}
         for i in self.permissions:
             try:
-                l[i] = self.permission_module[i]
+                aosp_permissions[i] = self.permission_module[i]
             except KeyError:
                 # if we have not found permission do nothing
                 continue
-        return l
+        return aosp_permissions
 
     def get_requested_third_party_permissions(self):
         """

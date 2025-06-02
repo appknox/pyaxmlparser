@@ -49,10 +49,10 @@ class SVs(object):
         self.__value = ntuple._make(unpack(self.__size, buff))
 
     def _get(self):
-        l = []
+        fields_list = []
         for i in self.__value._fields:
-            l.append(getattr(self.__value, i))
-        return pack(self.__size, *l)
+            fields_list.append(getattr(self.__value, i))
+        return pack(self.__size, *fields_list)
 
     def _export(self):
         return [x for x in self.__value._fields]
