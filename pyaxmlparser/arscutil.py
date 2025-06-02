@@ -19,7 +19,7 @@ import logging
 from struct import unpack
 import pyaxmlparser.constants as const
 from pyaxmlparser.utils import format_value
-from pyaxmlparser.exceptions import ResParserError, BufferUnderrunError
+from pyaxmlparser.exceptions import BufferUnderrunError
 
 log = logging.getLogger("pyaxmlparser.arscutil")
 

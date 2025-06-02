@@ -8,7 +8,7 @@ from pyaxmlparser.arscparser import ARSCParser
 from pyaxmlparser.axmlparser import AXMLParser
 from pyaxmlparser.axmlprinter import AXMLPrinter
 from pyaxmlparser.utils import NS_ANDROID
-from pyaxmlparser.exceptions import ResParserError, BufferUnderrunError, InvalidStringPoolError
+from pyaxmlparser.exceptions import BufferUnderrunError, InvalidStringPoolError
 
 
 PATH_INSTALL = "./"
