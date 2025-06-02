@@ -114,6 +114,7 @@ class BufferValidationTest(unittest.TestCase):
             sb = StringBlock(buff, header)
             self.assertIsNotNone(sb)
         except (InvalidStringPoolError, BufferUnderrunError):
+            # These exceptions are expected when testing with malformed data.
             pass
 
     def test_malformed_axml_handling(self):
